@@ -95,6 +95,30 @@ Recommendation. Use Freighter wallet extension for testing:
 
 https://www.freighter.app/
 
+https://developers.stellar.org/docs/build/guides/freighter
+
 Import accounts, enable trust lines, swap assets.
+
+---
+
+Dapp:
+
+```
+npx create-next-app@latest soroban-playground-dapp
+
+cd soroban-playground-dapp
+
+// dev command in package.json: "dev": "next dev --turbopack --experimental-https"
+
+npm install stellar-sdk @stellar/freighter-api bignumber.js
+
+npm run dev
+
+// Save the SSL certificate
+
+// Open https://localhost:3000/
+```
+
+https://developers.stellar.org/docs/build/guides/dapps/frontend-guide
 
 ---
