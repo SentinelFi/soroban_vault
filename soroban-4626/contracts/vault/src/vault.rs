@@ -70,7 +70,7 @@ impl IPublicVault for Vault {
 
     fn decimals(env: &Env) -> u32 {
         let decimals: u32 = read_asset_decimals(&env);
-        let result: u32 = safe_add_u32(decimals, Self::decimals_offset());
+        let result: u32 = safe_add_u32(decimals, Self::_decimals_offset());
         result
     }
 
@@ -79,14 +79,14 @@ impl IPublicVault for Vault {
         asset_address
     }
 
-    fn get_contract_address(env: &Env) -> Address {
+    fn contract_address(env: &Env) -> Address {
         env.current_contract_address()
     }
 
     fn total_assets(env: &Env) -> i128 {
         let asset_address: Address = read_asset_address(&env);
         let token_client = token::Client::new(&env, &asset_address);
-        let this_address: Address = Self::get_contract_address(&env);
+        let this_address: Address = Self::contract_address(&env);
         let balance: i128 = token_client.balance(&this_address);
         balance
     }
@@ -232,7 +232,7 @@ impl IPublicVault for Vault {
 
 #[allow(dead_code)]
 impl Vault {
-    fn transfer(
+    fn _transfer(
         env: Env,
         from: Address,
         to: Address,
@@ -243,20 +243,12 @@ impl Vault {
             Err(VaultError::InvalidAmount)
         } else {
             let decimals: u32 = read_asset_decimals(&env);
-
             let result_pow: i128 = safe_pow(10i128, decimals);
             let result: i128 = safe_mul(amount, result_pow);
 
-            let asset_address: Address = env
-                .storage()
-                .persistent()
-                .get(&DataKey::AssetAddress)
-                .unwrap();
-
+            let asset_address: Address = read_asset_address(&env);
             let token_client = token::Client::new(&env, &asset_address);
             token_client.transfer(&from, &to, &result);
-
-            // Emit some event?
 
             Ok((from, to, amount, decimals, result))
         }
@@ -267,7 +259,7 @@ impl Vault {
             assets,
             safe_add_i128(
                 Self::total_shares(env),
-                safe_pow(10, Self::decimals_offset()),
+                safe_pow(10, Self::_decimals_offset()),
             ),
             safe_add_i128(Self::total_assets(env), 1),
             rounding,
@@ -280,7 +272,7 @@ impl Vault {
             safe_add_i128(Self::total_assets(env), 1),
             safe_add_i128(
                 Self::total_shares(env),
-                safe_pow(10, Self::decimals_offset()),
+                safe_pow(10, Self::_decimals_offset()),
             ),
             rounding,
         )
@@ -293,9 +285,17 @@ impl Vault {
         _assets: i128,
         _shares: i128,
     ) -> () {
-        // Transfer Assets
+        _caller.require_auth();
+        // Transfer assets from caller to vault
+        // This must happen before minting shares to prevent reentrancy issues
+        let asset_address: Address = read_asset_address(_env);
+        let token_client = token::Client::new(_env, &asset_address);
+        token_client.transfer(&_caller, &Self::contract_address(_env), &_assets);
+        // POW multiply assets
         // Mint Shares
+        // Self::mint_shares(&receiver, &shares); // TODO
         // Emit Event
+        Self::_emit_deposit_event(_env, _caller, _receiver, _assets, _shares);
     }
 
     fn _withdraw(
@@ -306,16 +306,27 @@ impl Vault {
         _assets: i128,
         _shares: i128,
     ) -> () {
+        _caller.require_auth();
         // Spend Allowance
-        // Burn Shares
-        // Transfer Assets
+        if _caller != _owner {
+            //Self::spend_allowance(&env, &owner, &caller, shares); // TODO
+        }
+        // Burn share tokens from owner
+        // This must happen before transferring assets to prevent reentrancy
+        // Self::burn_shares(&owner, &shares); // TODO
+        // Transfer assets from vault to receiver
+        let asset_address: Address = read_asset_address(_env);
+        let token_client = token::Client::new(_env, &asset_address);
+        token_client.transfer(&Self::contract_address(_env), &_receiver, &_assets);
+        // POW multiply assets
         // Emit Event
+        Self::_emit_withdraw_event(_env, _caller, _receiver, _owner, _assets, _shares);
     }
 
-    fn emit_deposit_event(
+    fn _emit_deposit_event(
         env: &Env,
-        caller: Address,
-        receiver: Address,
+        caller: &Address,
+        receiver: &Address,
         assets: i128,
         shares: i128,
     ) {
@@ -323,11 +334,11 @@ impl Vault {
         env.events().publish(topics, (assets, shares));
     }
 
-    fn emit_withdraw_event(
+    fn _emit_withdraw_event(
         env: &Env,
-        caller: Address,
-        receiver: Address,
-        owner: Address,
+        caller: &Address,
+        receiver: &Address,
+        owner: &Address,
         assets: i128,
         shares: i128,
     ) {
@@ -335,7 +346,7 @@ impl Vault {
         env.events().publish(topics, (assets, shares));
     }
 
-    fn decimals_offset() -> u32 {
+    fn _decimals_offset() -> u32 {
         0
     }
 }

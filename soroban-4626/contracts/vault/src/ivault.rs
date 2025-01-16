@@ -14,7 +14,7 @@ pub trait IPublicVault {
     fn administrator_address(env: &Env) -> Address;
     fn decimals(env: &Env) -> u32;
     fn asset(env: &Env) -> Address;
-    fn get_contract_address(env: &Env) -> Address;
+    fn contract_address(env: &Env) -> Address;
     fn total_assets(env: &Env) -> i128;
     fn total_shares(env: &Env) -> i128;
     fn balance_of(env: &Env, address: Address) -> i128;
