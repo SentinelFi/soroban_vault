@@ -22,6 +22,12 @@ pub fn safe_add_i128(a: i128, b: i128) -> i128 {
         .unwrap()
 }
 
+pub fn safe_sub_i128(a: i128, b: i128) -> i128 {
+    a.checked_sub(b)
+        .ok_or(ContractError::ArithmeticError)
+        .unwrap()
+}
+
 pub fn safe_pow(a: i128, b: u32) -> i128 {
     a.checked_pow(b)
         .ok_or(ContractError::ArithmeticError)

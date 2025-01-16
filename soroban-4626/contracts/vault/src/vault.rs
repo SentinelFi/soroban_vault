@@ -7,22 +7,12 @@ use soroban_sdk::{
 use crate::{
     errors::{ContractError, VaultError},
     ivault::IPublicVault,
-    keys::DataKey,
-    math::{mul_div, safe_add_i128, safe_add_u32, safe_mul, safe_pow, Rounding},
+    math::{mul_div, safe_add_i128, safe_add_u32, safe_mul, safe_pow, safe_sub_i128, Rounding},
     storage::{
-        has_administrator,
-        read_administrator,
-        read_asset_address,
-        read_asset_decimals,
-        read_total_shares,
-        read_total_shares_of,
-        write_administrator,
-        write_asset_address,
-        write_asset_decimals,
-        write_asset_name,
-        write_asset_symbol,
-        write_total_shares,
-        // write_total_shares_of,
+        has_administrator, read_administrator, read_asset_address, read_asset_decimals,
+        read_total_shares, read_total_shares_of, write_administrator, write_asset_address,
+        write_asset_decimals, write_asset_name, write_asset_symbol, write_total_shares,
+        write_total_shares_of,
     },
 };
 
@@ -34,6 +24,7 @@ contractmeta!(
 #[contract]
 pub struct Vault;
 
+// Public functions
 #[contractimpl]
 impl IPublicVault for Vault {
     fn initialize(
@@ -230,6 +221,7 @@ impl IPublicVault for Vault {
     }
 }
 
+// Private functions
 #[allow(dead_code)]
 impl Vault {
     fn _transfer(
@@ -278,6 +270,39 @@ impl Vault {
         )
     }
 
+    /*
+       While multiple users can call the Soroban's contract concurrently, each transaction's storage operations are atomic.
+       The contract's storage can only be in a valid state before and after each transaction.
+       If two transactions try to modify the same storage simultaneously, Soroban's consensus mechanism ensures they're processed sequentially.
+
+       In Soroban, storage operations within a single contract invocation are atomic - the entire transaction either succeeds or fails.
+       However, it's still important to handle concurrent invocations properly.
+    */
+
+    fn _mint_shares(_env: &Env, _receiver: &Address, _shares: i128) -> () {
+        let current_total = read_total_shares(&_env);
+        let receiver_shares = read_total_shares_of(&_env, _receiver.clone());
+        write_total_shares(&_env, &safe_add_i128(current_total, _shares));
+        write_total_shares_of(
+            &_env,
+            _receiver.clone(),
+            &safe_add_i128(receiver_shares, _shares),
+        );
+    }
+
+    fn _burn_shares(_env: &Env, _owner: &Address, _shares: i128) -> () {
+        let owner_shares = read_total_shares_of(&_env, _owner.clone());
+        // if owner_shares < _shares { // already veified at higher level?
+        //Err(VaultError::InsufficientShares);
+        //}
+        let current_total = read_total_shares(&_env);
+        //if current_total < _shares {
+        //Err(VaultError::InsufficientShares);
+        //}
+        write_total_shares(&_env, &safe_sub_i128(current_total, _shares));
+        write_total_shares_of(&_env, _owner.clone(), &safe_sub_i128(owner_shares, _shares));
+    }
+
     fn _deposit(
         _env: &Env,
         _caller: &Address,
@@ -285,16 +310,19 @@ impl Vault {
         _assets: i128,
         _shares: i128,
     ) -> () {
-        _caller.require_auth();
-        // Transfer assets from caller to vault
+        // Assume that here we receive already valid parameters, i.e. caller is authorized, amounts are validated and so on
+        // _caller.require_auth();
+        // check shares and assets > 0
+        // has enough assets to deposit
+        // Transfer underlying assets from caller to vault
         // This must happen before minting shares to prevent reentrancy issues
         let asset_address: Address = read_asset_address(_env);
         let token_client = token::Client::new(_env, &asset_address);
         token_client.transfer(&_caller, &Self::contract_address(_env), &_assets);
-        // POW multiply assets
-        // Mint Shares
-        // Self::mint_shares(&receiver, &shares); // TODO
-        // Emit Event
+        // TODO: POW multiply assets
+        // Mint new share tokens to receiver, update total shares and receiver's shares
+        Self::_mint_shares(&_env, &_receiver, _shares);
+        // Emit event
         Self::_emit_deposit_event(_env, _caller, _receiver, _assets, _shares);
     }
 
@@ -306,20 +334,23 @@ impl Vault {
         _assets: i128,
         _shares: i128,
     ) -> () {
-        _caller.require_auth();
+        // Assume that here we receive already valid parameters, i.e. caller is authorized, amounts are validated and so on
+        // _caller.require_auth();
+        // check > 0
+        // Verify owner has enough shares
         // Spend Allowance
         if _caller != _owner {
             //Self::spend_allowance(&env, &owner, &caller, shares); // TODO
         }
-        // Burn share tokens from owner
+        // Burn share tokens from owner, update total shares and owner's shares
         // This must happen before transferring assets to prevent reentrancy
-        // Self::burn_shares(&owner, &shares); // TODO
-        // Transfer assets from vault to receiver
+        Self::_burn_shares(&_env, _owner, _shares);
+        // Transfer underlying assets from vault to receiver
         let asset_address: Address = read_asset_address(_env);
         let token_client = token::Client::new(_env, &asset_address);
         token_client.transfer(&Self::contract_address(_env), &_receiver, &_assets);
-        // POW multiply assets
-        // Emit Event
+        // TODO: POW multiply assets
+        // Emit event
         Self::_emit_withdraw_event(_env, _caller, _receiver, _owner, _assets, _shares);
     }
 

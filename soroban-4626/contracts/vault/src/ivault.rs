@@ -1,9 +1,6 @@
 use soroban_sdk::{Address, Env, String};
 
-use crate::{
-    errors::{ContractError, VaultError},
-    math::Rounding,
-};
+use crate::errors::{ContractError, VaultError};
 
 pub trait IPublicVault {
     fn initialize(
