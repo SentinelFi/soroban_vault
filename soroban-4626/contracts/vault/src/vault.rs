@@ -8,7 +8,7 @@ use crate::{
     errors::{ContractError, VaultError},
     ivault::IPublicVault,
     keys::DataKey,
-    math::{mul_div, safe_add, safe_mul, safe_pow, Rounding},
+    math::{mul_div, safe_add_i128, safe_add_u32, safe_mul, safe_pow, Rounding},
     storage::{
         has_administrator,
         read_administrator,
@@ -70,7 +70,7 @@ impl IPublicVault for Vault {
 
     fn decimals(env: &Env) -> u32 {
         let decimals: u32 = read_asset_decimals(&env);
-        let result: u32 = safe_add(decimals, Self::decimals_offset());
+        let result: u32 = safe_add_u32(decimals, Self::decimals_offset());
         result
     }
 
@@ -97,24 +97,24 @@ impl IPublicVault for Vault {
     }
 
     fn balance_of(env: &Env, address: Address) -> i128 {
-        address.require_auth();
+        // address.require_auth(); not needed?
         let balance: i128 = read_total_shares_of(&env, address.clone());
         balance
     }
 
-    fn convert_to_shares(env: &Env, assets: i128, rounding: Rounding) -> i128 {
-        Self::_convert_to_shares(env, assets, rounding)
+    fn convert_to_shares(env: &Env, assets: i128) -> i128 {
+        Self::_convert_to_shares(env, assets, Rounding::Floor)
     }
 
-    fn convert_to_assets(env: &Env, shares: i128, rounding: Rounding) -> i128 {
-        Self::_convert_to_assets(env, shares, rounding)
+    fn convert_to_assets(env: &Env, shares: i128) -> i128 {
+        Self::_convert_to_assets(env, shares, Rounding::Floor)
     }
 
-    fn max_deposit(_: &Env, _adress: Address) -> i128 {
+    fn max_deposit(_: &Env, _address: Address) -> i128 {
         i128::MAX
     }
 
-    fn max_mint(_: &Env, _adress: Address) -> i128 {
+    fn max_mint(_: &Env, _address: Address) -> i128 {
         i128::MAX
     }
 
@@ -128,19 +128,19 @@ impl IPublicVault for Vault {
     }
 
     fn preview_deposit(env: &Env, assets: i128) -> i128 {
-        Self::convert_to_shares(&env, assets, Rounding::Floor)
+        Self::_convert_to_shares(&env, assets, Rounding::Floor)
     }
 
     fn preview_mint(env: &Env, shares: i128) -> i128 {
-        Self::convert_to_assets(&env, shares, Rounding::Ceil)
+        Self::_convert_to_assets(&env, shares, Rounding::Ceil)
     }
 
     fn preview_withdraw(env: &Env, assets: i128) -> i128 {
-        Self::convert_to_shares(&env, assets, Rounding::Ceil)
+        Self::_convert_to_shares(&env, assets, Rounding::Ceil)
     }
 
     fn preview_redeem(env: &Env, shares: i128) -> i128 {
-        Self::convert_to_assets(&env, shares, Rounding::Floor)
+        Self::_convert_to_assets(&env, shares, Rounding::Floor)
     }
 
     fn deposit(
@@ -265,8 +265,11 @@ impl Vault {
     fn _convert_to_shares(env: &Env, assets: i128, rounding: Rounding) -> i128 {
         mul_div(
             assets,
-            Self::total_shares(env) + safe_pow(10, Self::decimals_offset()),
-            Self::total_assets(env) + 1,
+            safe_add_i128(
+                Self::total_shares(env),
+                safe_pow(10, Self::decimals_offset()),
+            ),
+            safe_add_i128(Self::total_assets(env), 1),
             rounding,
         )
     }
@@ -274,8 +277,11 @@ impl Vault {
     fn _convert_to_assets(env: &Env, shares: i128, rounding: Rounding) -> i128 {
         mul_div(
             shares,
-            Self::total_assets(env) + 1,
-            Self::total_shares(env) + safe_pow(10, Self::decimals_offset()),
+            safe_add_i128(Self::total_assets(env), 1),
+            safe_add_i128(
+                Self::total_shares(env),
+                safe_pow(10, Self::decimals_offset()),
+            ),
             rounding,
         )
     }

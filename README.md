@@ -32,7 +32,7 @@ stellar contract deploy `
   --source bob `
   --network testnet
 
-Copy-paste deployed contract address, bob's (or similar) address and underlying asset address:
+// Copy-paste deployed contract address, bob's (or similar) address and underlying asset address:
 
 stellar contract invoke --id <contract_address> --source bob --network testnet -- initialize --admin <admin_address> --asset_address <asset_address>
 ```
