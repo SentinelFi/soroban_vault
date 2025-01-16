@@ -12,6 +12,8 @@ import {
   getAddress,
   signTransaction,
 } from "@stellar/freighter-api";
+import Link from "next/link";
+import Nav from "@/components/Nav";
 
 export default function Home() {
   const [publicKey, setPublicKey] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export default function Home() {
     }
 
     try {
-      const SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org";
+      const SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org:443";
       const timeoutInSeconds = 30;
       const networkPhrase = StellarSdk.Networks.TESTNET;
       const server = new Server(SOROBAN_RPC_URL);
@@ -108,6 +110,7 @@ export default function Home() {
 
   return (
     <div className="max-w-md mx-auto">
+      <Nav />
       <h2 className="text-2xl font-bold mb-4">Send Payment</h2>
       {publicKey ? (
         <>
