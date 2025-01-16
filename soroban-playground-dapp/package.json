@@ -10,11 +10,11 @@
   },
   "dependencies": {
     "@stellar/freighter-api": "^4.0.0",
+    "@stellar/stellar-sdk": "^13.1.0",
     "bignumber.js": "^9.1.2",
     "next": "15.1.4",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "stellar-sdk": "^13.1.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",

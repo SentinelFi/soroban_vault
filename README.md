@@ -110,7 +110,9 @@ cd soroban-playground-dapp
 
 // dev command in package.json: "dev": "next dev --turbopack --experimental-https"
 
-npm install stellar-sdk @stellar/freighter-api bignumber.js
+npm install @stellar/freighter-api bignumber.js
+
+npm install --save @stellar/stellar-sdk
 
 npm run dev
 
@@ -120,5 +122,9 @@ npm run dev
 ```
 
 https://developers.stellar.org/docs/build/guides/dapps/frontend-guide
+
+https://github.com/stellar/js-stellar-sdk
+
+https://docs.freighter.app/docs/guide/usingFreighterWebApp
 
 ---
