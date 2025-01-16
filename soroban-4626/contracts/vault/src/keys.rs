@@ -9,5 +9,6 @@ pub enum DataKey {
     AssetSymbol,
     AssetDecimals,
     TotalShares,
-    TotalSharesOf(Address),
+    TotalSharesOf(Address),      // (hodler)
+    Allowance(Address, Address), // (owner, spender)
 }

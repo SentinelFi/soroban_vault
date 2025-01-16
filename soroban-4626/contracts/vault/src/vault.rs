@@ -5,6 +5,7 @@ use soroban_sdk::{
 };
 
 use crate::{
+    allowance::{_approve_allowance, _calculate_expiry_ledger, _spend_allowance},
     errors::{ContractError, VaultError},
     ivault::IPublicVault,
     math::{mul_div, safe_add_i128, safe_add_u32, safe_mul, safe_pow, safe_sub_i128, Rounding},
@@ -219,6 +220,18 @@ impl IPublicVault for Vault {
             }
         }
     }
+
+    fn approve(
+        env: Env,
+        owner: Address,
+        spender: Address,
+        approve_amount: i128,
+        expire_in_days: u32,
+    ) -> Result<(), VaultError> {
+        owner.require_auth();
+        let expiry_ledger: u32 = _calculate_expiry_ledger(&env, expire_in_days)?;
+        _approve_allowance(&env, &owner, &spender, approve_amount, expiry_ledger)
+    }
 }
 
 // Private functions
@@ -311,8 +324,6 @@ impl Vault {
         _shares: i128,
     ) -> () {
         // Assume that here we receive already valid parameters, i.e. caller is authorized, amounts are validated and so on
-        // _caller.require_auth();
-        // check shares and assets > 0
         // has enough assets to deposit
         // Transfer underlying assets from caller to vault
         // This must happen before minting shares to prevent reentrancy issues
@@ -335,12 +346,10 @@ impl Vault {
         _shares: i128,
     ) -> () {
         // Assume that here we receive already valid parameters, i.e. caller is authorized, amounts are validated and so on
-        // _caller.require_auth();
-        // check > 0
         // Verify owner has enough shares
-        // Spend Allowance
+        // Spend allowance
         if _caller != _owner {
-            //Self::spend_allowance(&env, &owner, &caller, shares); // TODO
+            _spend_allowance(&_env, &_owner, &_caller, _shares).unwrap();
         }
         // Burn share tokens from owner, update total shares and owner's shares
         // This must happen before transferring assets to prevent reentrancy

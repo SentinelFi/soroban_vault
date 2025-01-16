@@ -11,6 +11,11 @@ pub enum VaultError {
     InvalidAmount = 5,
     ZeroAssets = 6,
     ZeroShares = 7,
+    NoAllowance = 8,
+    InsufficientAllowance = 9,
+    AllowanceExpired = 10,
+    InvalidExpiry = 11,
+    InvalidExpiryDays = 12,
 }
 
 #[contracterror]

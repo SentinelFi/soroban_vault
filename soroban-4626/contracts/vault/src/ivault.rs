@@ -47,4 +47,11 @@ pub trait IPublicVault {
         receiver: Address,
         owner: Address,
     ) -> Result<i128, VaultError>;
+    fn approve(
+        env: Env,
+        owner: Address,
+        spender: Address,
+        approve_amount: i128,
+        expire_in_days: u32,
+    ) -> Result<(), VaultError>;
 }

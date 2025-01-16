@@ -1,4 +1,4 @@
-use crate::keys::DataKey;
+use crate::{allowance::AllowanceData, keys::DataKey};
 use soroban_sdk::{Address, Env, String};
 
 // Anything stored in instance storage has an archival TTL that is tied to the contract instance itself.
@@ -45,7 +45,6 @@ pub fn write_total_shares(e: &Env, shares: &i128) {
     e.storage().persistent().set(&key, shares);
 }
 
-#[allow(dead_code)]
 pub fn write_total_shares_of(e: &Env, adress: Address, shares: &i128) {
     let key = DataKey::TotalSharesOf(adress);
     e.storage().persistent().set(&key, shares);
@@ -69,4 +68,19 @@ pub fn read_total_shares(e: &Env) -> i128 {
 pub fn read_total_shares_of(e: &Env, address: Address) -> i128 {
     let key = DataKey::TotalSharesOf(address);
     e.storage().persistent().get(&key).unwrap_or(0)
+}
+
+pub fn read_allowance(e: &Env, owner: Address, spender: Address) -> Option<AllowanceData> {
+    let key = DataKey::Allowance(owner.clone(), spender.clone());
+    e.storage().persistent().get(&key)
+}
+
+pub fn write_allowance(e: &Env, owner: Address, spender: Address, allowance: AllowanceData) {
+    let key = DataKey::Allowance(owner.clone(), spender.clone());
+    e.storage().persistent().set(&key, &allowance);
+}
+
+pub fn remove_allowance(e: &Env, owner: Address, spender: Address) {
+    let key = DataKey::Allowance(owner.clone(), spender.clone());
+    e.storage().persistent().remove(&key);
 }
