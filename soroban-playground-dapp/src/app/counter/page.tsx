@@ -21,7 +21,7 @@ import {
 import { ConnectButton } from "@/components/ConnectWalletButton";
 import Nav from "@/components/Nav";
 
-// Replace with your actual contract ID and network details
+// Replace with the actual contract ID and network details
 const CONTRACT_ID = "CA6KLVEYFY6VV77AGIBM572RJSJKXFNN52U4SSG6NRZ4PRDUQQIEYJZF";
 const NETWORK_PASSPHRASE = Networks.TESTNET;
 const SOROBAN_URL = "https://soroban-testnet.stellar.org:443";
@@ -30,7 +30,7 @@ const TIMEOUT_SEC = 30;
 export default function CounterPage() {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [count, setCount] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const checkWallet = async () => {
@@ -58,6 +58,8 @@ export default function CounterPage() {
       const server = new Server(SOROBAN_URL);
       const account = await server.getAccount(publicKey);
 
+      console.log("Acc", account);
+
       const contract = new Contract(CONTRACT_ID);
       //   const instance = contract.getFootprint();
 
@@ -68,23 +70,56 @@ export default function CounterPage() {
 
       console.log("Build Tx");
 
-      const tx = new TransactionBuilder(account, {
+      const transaction = new TransactionBuilder(account, {
         fee: BASE_FEE,
-        networkPassphrase: NETWORK_PASSPHRASE,
       })
-        .addOperation(operation)
+        .setNetworkPassphrase(NETWORK_PASSPHRASE)
         .setTimeout(TIMEOUT_SEC)
+        .addOperation(operation)
         .build();
 
       console.log("Simulate Tx");
 
-      const simulateResponse = await server.simulateTransaction(tx);
+      //const simulateResponse = await server.simulateTransaction(transaction);
+      //console.log("Simulate Response: ", simulateResponse);
 
-      console.log("Simulate Response: ", simulateResponse);
+      console.log("Prepare Tx", transaction);
 
-      console.log("Prepare Tx");
+      const preparedTx = await server.prepareTransaction(transaction);
 
-      const preparedTx = await server.prepareTransaction(tx);
+      console.log("Prepared: ", preparedTx);
+
+      /* @example
+       * const contractId = 'CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE';
+       * const contract = new StellarSdk.Contract(contractId);
+       *
+       * // Right now, this is just the default fee for this example.
+       * const fee = StellarSdk.BASE_FEE;
+       * const transaction = new StellarSdk.TransactionBuilder(account, { fee })
+       *   // Uncomment the following line to build transactions for the live network. Be
+       *   // sure to also change the horizon hostname.
+       *   //.setNetworkPassphrase(StellarSdk.Networks.PUBLIC)
+       *   .setNetworkPassphrase(StellarSdk.Networks.FUTURENET)
+       *   .setTimeout(30) // valid for the next 30s
+       *   // Add an operation to call increment() on the contract
+       *   .addOperation(contract.call("increment"))
+       *   .build();
+       *
+       * const preparedTransaction = await server.prepareTransaction(transaction);
+       *
+       * // Sign this transaction with the secret key
+       * // NOTE: signing is transaction is network specific. Test network transactions
+       * // won't work in the public network. To switch networks, use the Network object
+       * // as explained above (look for StellarSdk.Network).
+       * const sourceKeypair = StellarSdk.Keypair.fromSecret(sourceSecretKey);
+       * preparedTransaction.sign(sourceKeypair);
+       *
+       * server.sendTransaction(transaction).then(result => {
+       *   console.log("hash:", result.hash);
+       *   console.log("status:", result.status);
+       *   console.log("errorResultXdr:", result.errorResultXdr);
+       * });
+       */
 
       console.log("Sign Tx");
 
@@ -92,6 +127,7 @@ export default function CounterPage() {
         preparedTx.toEnvelope().toXDR("base64"),
         {
           networkPassphrase: NETWORK_PASSPHRASE,
+          //address: publicKey,
         }
       );
 
@@ -149,9 +185,9 @@ export default function CounterPage() {
       }
     } catch (error) {
       console.error("Error incrementing counter.", error);
-      alert(
-        "Error incrementing counter. Please check the console for details."
-      );
+      // alert(
+      //   "Error incrementing counter. Please check the console for details."
+      // );
     } finally {
       setLoading(false);
     }
@@ -164,6 +200,7 @@ export default function CounterPage() {
       {publicKey ? (
         <div>
           <p className="mb-4">Connected: {publicKey}</p>
+          <p className="mb-4">Contract ID: {CONTRACT_ID}</p>
           <p className="mb-4">
             Current Count: {count === null ? "Probably Zero" : count}
           </p>

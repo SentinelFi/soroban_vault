@@ -12,7 +12,6 @@ import {
   getAddress,
   signTransaction,
 } from "@stellar/freighter-api";
-import Link from "next/link";
 import Nav from "@/components/Nav";
 
 export default function Home() {
@@ -70,8 +69,10 @@ export default function Home() {
       const SOROBAN_RPC_URL = "https://soroban-testnet.stellar.org:443";
       const timeoutInSeconds = 30;
       const networkPhrase = StellarSdk.Networks.TESTNET;
+
       const server = new Server(SOROBAN_RPC_URL);
       const sourceAccount = await server.getAccount(publicKey);
+
       const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
         fee: StellarSdk.BASE_FEE,
         networkPassphrase: networkPhrase,
