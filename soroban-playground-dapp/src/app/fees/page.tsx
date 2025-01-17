@@ -8,20 +8,19 @@ import { isConnected, setAllowed, getAddress } from "@stellar/freighter-api";
 
 import Nav from "@/components/Nav";
 
-interface AssetType {
-  code: string;
-  balance: string;
+interface FeeType {
+  lastLedgerBaseFee: string;
+  lastLedger: string;
+  ledgerCapacityUsage: string;
+  maxFee: string;
+  modeFee: string;
+  minFee: string;
+  feeChargedP99: string;
 }
 
-interface AssetBalances {
-  native: string;
-  other: AssetType[];
-}
-
-export default function Balances() {
+export default function Fees() {
   const [publicKey, setPublicKey] = useState<string | null>(null);
-  const [xlmBalance, setXlmBalance] = useState<string>("");
-  const [otherBalances, setOtherBalances] = useState<AssetType[]>([]);
+  const [feeValues, setFeeValues] = useState<FeeType | null>(null);
 
   useEffect(() => {
     const checkFreighter = async () => {
@@ -46,12 +45,11 @@ export default function Balances() {
   }, []);
 
   useEffect(() => {
-    const fetchBalance = async () => {
-      const balances = await fetchBalances();
-      setXlmBalance(balances.native);
-      setOtherBalances(balances.other);
+    const fetch = async () => {
+      const fee = await fetchFee();
+      setFeeValues(fee);
     };
-    fetchBalance();
+    fetch();
   }, []);
 
   const handleConnectWallet = async () => {
@@ -74,7 +72,7 @@ export default function Balances() {
     }
   };
 
-  async function fetchBalances(): Promise<AssetBalances> {
+  async function fetchFee(): Promise<FeeType | null> {
     try {
       const connected = await isConnected();
 
@@ -93,58 +91,65 @@ export default function Balances() {
 
       const server = new StellarSdk.Horizon.Server(HORIZON_URL);
 
-      const acc = await server.accounts().accountId(publicKey?.address).call();
-      const balances = acc?.balances;
+      const fees = await server.feeStats();
+      if (!fees) throw new Error("Fees not found");
+      console.log("Fees", fees);
 
-      if (!balances) throw new Error("Account balances not found");
+      //   const fee = await server.fetchBaseFee();
+      //   if (!fee) throw new Error("Fee not found");
+      //   console.log("Fee", fee);
 
-      // Find the native balance
-      const nativeBalance: string =
-        balances.find((balance) => balance.asset_type === "native")?.balance ??
-        "0";
-
-      // Filter out non-native balances
-      const otherBalances: AssetType[] = balances
-        .filter((balance) => balance.asset_type !== "native")
-        .map((bal: any) => ({ code: bal.asset_code, balance: bal.balance }));
-
-      console.log("XLM", nativeBalance);
-      console.log("Other", otherBalances);
-
-      return { native: nativeBalance, other: otherBalances };
+      return {
+        lastLedgerBaseFee: fees.last_ledger_base_fee,
+        lastLedger: fees.last_ledger,
+        ledgerCapacityUsage: fees.ledger_capacity_usage,
+        maxFee: fees.max_fee.max,
+        modeFee: fees.max_fee.mode,
+        minFee: fees.max_fee.min,
+        feeChargedP99: fees.fee_charged.p99,
+      };
     } catch (error) {
-      console.error("Error fetching balances:", error);
-      return { native: "0", other: [] };
+      console.error("Error fetching fee:", error);
+      return null;
     }
   }
 
+  // https://developers.stellar.org/docs/learn/fundamentals/fees-resource-limits-metering
   return (
     <div className="max-w-md mx-auto">
       <Nav />
-      <h2 className="text-2xl font-bold mb-4">Asset Balances</h2>
+      <h2 className="text-2xl font-bold mb-4">Network Fees</h2>
       {publicKey ? (
         <>
           <p className="mb-4">Connected: {publicKey}</p>
+          <p className="italic">
+            Stroop: the smallest unit of a lumen, one ten-millionth of a lumen
+            (.0000001 XLM).
+          </p>
           <button
-            className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded"
-            onClick={() => fetchBalances()}
+            className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded mt-4"
+            onClick={() => fetchFee()}
           >
-            Refetch Balances
+            Refetch Fee
           </button>
-          {xlmBalance && xlmBalance !== "0" && (
+          {feeValues && (
             <div className="mt-4">
-              <h2 className="text-xl text-gray-500">Your Native Balance:</h2>
-              <p>{xlmBalance} XLM</p>
-            </div>
-          )}
-          {otherBalances && otherBalances.length > 0 && (
-            <div className="mt-4">
-              <h2 className="text-xl text-gray-500">Your Other Balances:</h2>
-              {otherBalances.map((bal, id) => (
-                <p key={id + bal.code}>
-                  {bal.balance} {bal.code}
-                </p>
-              ))}
+              <h2 className="text-xl text-gray-500">Last Base Fee:</h2>
+              <p>{feeValues.lastLedgerBaseFee}</p>
+              <h2 className="text-xl text-gray-500">Last Ledger:</h2>
+              <p>{feeValues.lastLedger}</p>
+              <h2 className="text-xl text-gray-500">Ledger Capacity Usage:</h2>
+              <p>{feeValues.ledgerCapacityUsage}</p>
+              <h2 className="text-xl text-gray-500 mt-4">Min Fee:</h2>
+              <p>{feeValues.minFee}</p>
+              <h2 className="text-xl text-gray-500">Max Fee:</h2>
+              <p>{feeValues.maxFee}</p>
+              <h2 className="text-xl text-gray-500">Mode Fee:</h2>
+              <p>{feeValues.modeFee}</p>
+              <h2 className="text-xl text-gray-500">
+                Fee Charged P99 (99th percentile):
+              </h2>
+              <p>{feeValues.feeChargedP99}</p>
             </div>
           )}
         </>

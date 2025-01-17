@@ -12,6 +12,9 @@ const Nav = () => {
       <Link href="/counter" className="mr-4 text-blue-500 hover:text-blue-700">
         COUNTER
       </Link>
+      <Link href="/fees" className="mr-4 text-blue-500 hover:text-blue-700">
+        FEES
+      </Link>
     </nav>
   );
 };
