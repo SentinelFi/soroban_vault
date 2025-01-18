@@ -2,8 +2,8 @@
 
 mod allowance;
 mod errors;
-mod ivault;
+pub mod ivault;
 mod keys;
 mod math;
 mod storage;
-mod vault;
+pub mod vault;

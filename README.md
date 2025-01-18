@@ -23,6 +23,8 @@ stellar keys show bob
 Contract:
 
 ```
+cd soroban-4626
+
 stellar contract build
 
 stellar contract optimize --wasm target/wasm32-unknown-unknown/release/vault.wasm

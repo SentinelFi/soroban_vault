@@ -1,7 +1,7 @@
 // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/extensions/ERC4626.sol
 
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, symbol_short, token, Address, Env, String,
+    contract, contractclient, contractimpl, contractmeta, symbol_short, token, Address, Env, String,
 };
 
 use crate::{
@@ -26,6 +26,7 @@ contractmeta!(
 pub struct Vault;
 
 // Public functions
+#[contractclient(name = "VaultContractClient")]
 #[contractimpl]
 impl IPublicVault for Vault {
     fn initialize(
