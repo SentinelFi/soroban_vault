@@ -54,6 +54,12 @@ pub trait IPublicVault {
         approve_amount: i128,
         expire_in_days: u32,
     ) -> Result<(), VaultError>;
+    fn transfer_shares(
+        env: Env,
+        owner: Address,
+        receiver: Address,
+        shares_amount: i128,
+    ) -> Result<bool, VaultError>;
     fn is_paused(env: Env) -> bool;
     fn pause(env: Env) -> Result<bool, ContractError>;
     fn unpause(env: Env) -> Result<bool, ContractError>;

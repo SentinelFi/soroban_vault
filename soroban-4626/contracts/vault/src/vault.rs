@@ -89,7 +89,6 @@ impl IPublicVault for Vault {
     }
 
     fn balance_of(env: &Env, address: Address) -> i128 {
-        // address.require_auth(); not needed?
         let balance: i128 = read_total_shares_of(&env, address.clone());
         balance
     }
@@ -233,6 +232,35 @@ impl IPublicVault for Vault {
         _approve_allowance(&env, &owner, &spender, approve_amount, expiry_ledger)
     }
 
+    fn transfer_shares(
+        env: Env,
+        owner: Address,
+        receiver: Address,
+        shares_amount: i128,
+    ) -> Result<bool, VaultError> {
+        owner.require_auth();
+        let owner_shares: i128 = read_total_shares_of(&env, owner.clone());
+        if owner_shares < shares_amount {
+            Err(VaultError::InvalidAmount)
+        } else {
+            // Change owner's and receiver's token balances
+            // Total shares should remain unchanged
+            let receiver_shares: i128 = read_total_shares_of(&env, receiver.clone());
+            write_total_shares_of(
+                &env,
+                owner.clone(),
+                &safe_sub_i128(owner_shares, shares_amount),
+            );
+            write_total_shares_of(
+                &env,
+                receiver.clone(),
+                &safe_add_i128(receiver_shares, shares_amount),
+            );
+            Self::_emit_transfer_shares_event(&env, &owner, &receiver, shares_amount);
+            Ok(true)
+        }
+    }
+
     fn is_paused(env: Env) -> bool {
         is_paused(&env)
     }
@@ -276,21 +304,25 @@ impl Vault {
         from: Address,
         to: Address,
         amount: i128,
-    ) -> Result<(Address, Address, i128, u32, i128), VaultError> {
+    ) -> Result<(Address, Address, i128, i128), VaultError> {
         from.require_auth();
         if amount <= 0 {
             Err(VaultError::InvalidAmount)
         } else {
-            let decimals: u32 = read_asset_decimals(&env);
-            let result_pow: i128 = safe_pow(10i128, decimals);
-            let result: i128 = safe_mul(amount, result_pow);
-
+            let result: i128 = Self::_multiply_by_decimals(&env, amount);
             let asset_address: Address = read_asset_address(&env);
             let token_client = token::Client::new(&env, &asset_address);
             token_client.transfer(&from, &to, &result);
 
-            Ok((from, to, amount, decimals, result))
+            Ok((from, to, amount, result))
         }
+    }
+
+    fn _multiply_by_decimals(env: &Env, amount: i128) -> i128 {
+        let decimals: u32 = read_asset_decimals(&env);
+        let result_pow: i128 = safe_pow(10i128, decimals);
+        let result: i128 = safe_mul(amount, result_pow);
+        result
     }
 
     fn _convert_to_shares(env: &Env, assets: i128, rounding: Rounding) -> i128 {
@@ -368,10 +400,10 @@ impl Vault {
         Self::_ensure_not_paused(_env);
         // Transfer underlying assets from caller to vault
         // This must happen before minting shares to prevent reentrancy issues
+        let result: i128 = Self::_multiply_by_decimals(&_env, _assets);
         let asset_address: Address = read_asset_address(_env);
         let token_client = token::Client::new(_env, &asset_address);
-        token_client.transfer(&_caller, &Self::contract_address(_env), &_assets);
-        // TODO: POW multiply assets
+        token_client.transfer(&_caller, &Self::contract_address(_env), &result);
         // Mint new share tokens to receiver, update total shares and receiver's shares
         Self::_mint_shares(&_env, &_receiver, _shares);
         // Emit event
@@ -397,12 +429,17 @@ impl Vault {
         // This must happen before transferring assets to prevent reentrancy
         Self::_burn_shares(&_env, _owner, _shares);
         // Transfer underlying assets from vault to receiver
+        let result: i128 = Self::_multiply_by_decimals(&_env, _assets);
         let asset_address: Address = read_asset_address(_env);
         let token_client = token::Client::new(_env, &asset_address);
-        token_client.transfer(&Self::contract_address(_env), &_receiver, &_assets);
-        // TODO: POW multiply assets
+        token_client.transfer(&Self::contract_address(_env), &_receiver, &result);
         // Emit event
         Self::_emit_withdraw_event(_env, _caller, _receiver, _owner, _assets, _shares);
+    }
+
+    fn _emit_transfer_shares_event(env: &Env, owner: &Address, receiver: &Address, shares: i128) {
+        let topics = (symbol_short!("shares"), owner, receiver);
+        env.events().publish(topics, shares);
     }
 
     fn _emit_deposit_event(
