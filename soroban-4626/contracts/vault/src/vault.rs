@@ -52,6 +52,15 @@ impl IPublicVault for Vault {
             write_total_shares(&env, &0i128);
             write_administrator(&env, &admin);
 
+            Self::_emit_initialized_event(
+                &env,
+                &admin,
+                &asset_address,
+                name.clone(),
+                symbol.clone(),
+                decimals,
+            );
+
             Ok((name, symbol, decimals))
         }
     }
@@ -310,10 +319,10 @@ impl IPublicVault for Vault {
         expire_in_days: u32,
     ) -> Result<(), VaultError> {
         if has_administrator(&env) {
+            owner.require_auth();
             if approve_amount <= 0 {
                 Err(VaultError::InvalidAmount)
             } else {
-                owner.require_auth();
                 let expiry_ledger: u32 = _calculate_expiry_ledger(&env, expire_in_days)?;
                 _approve_allowance(&env, &owner, &spender, approve_amount, expiry_ledger)
             }
@@ -541,6 +550,19 @@ impl Vault {
         token_client.transfer(&Self::contract_address(_env), &_receiver, &result);
         // Emit event
         Self::_emit_withdraw_event(_env, _caller, _receiver, _owner, _assets, _shares);
+    }
+
+    fn _emit_initialized_event(
+        env: &Env,
+        admin: &Address,
+        asset: &Address,
+        name: String,
+        symbol: String,
+        decimals: u32,
+    ) {
+        let topics = (symbol_short!("init"), admin);
+        env.events()
+            .publish(topics, (asset, name, symbol, decimals));
     }
 
     fn _emit_transfer_shares_event(env: &Env, owner: &Address, receiver: &Address, shares: i128) {
