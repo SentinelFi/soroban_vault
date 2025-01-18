@@ -1,10 +1,17 @@
 use crate::{allowance::AllowanceData, keys::DataKey};
 use soroban_sdk::{Address, Env, String};
 
-// Anything stored in instance storage has an archival TTL that is tied to the contract instance itself.
-// So, if a contract is live and available, the instance storage is guaranteed to be so, too.
-// Instance storage is really useful for global contract data that is shared among all users of the contract.
-
+/*
+  Anything stored in instance storage has an archival TTL that is tied to the contract instance itself.
+  So, if a contract is live and available, the instance storage is guaranteed to be so, too.
+  Instance storage is really useful for global contract data that is shared among all users of the contract.
+  Persistent storage can be very useful for ledger entrys that are not common across every user
+  of the contract instance, but that are not suitable to be temporary (user balances, for example).
+  Temporary storage is suitable for data that is only necessary for a relatively short and well-defined time period.
+  The benefit of temporary storage is the smaller cost and the ability to set a very low TTL,
+  both of which result in lower rent fees compared to persistent storage.
+  https://developers.stellar.org/docs/build/guides/storage/choosing-the-right-storage
+*/
 pub fn has_administrator(e: &Env) -> bool {
     let key = DataKey::AdminAddress;
     e.storage().instance().has(&key)
@@ -98,4 +105,42 @@ pub fn write_paused(e: &Env) {
 pub fn remove_paused(e: &Env) {
     let key = DataKey::IsPaused;
     e.storage().instance().remove(&key);
+}
+
+/*
+  State archival is a special mechanism defined by the Stellar protocol that ensures
+  that the active ledger state size doesn't grow indefinitely.
+  In simple terms, every stored contract data entry, as well as contract code (Wasm) entry,
+  has a certain 'time-to-live' (TTL) assigned.
+  The TTL is the number of ledgers between the current ledger and the final ledger for which the contract data can still be accessed.
+  If the TTL expires, the contract's code becomes archived and inaccessible.
+  To prevent this, you need to periodically extend the TTL of the contract's Wasm code.
+  When you extend a contract instance, this includes:
+  - the contract instance itself
+  - any env.storage().instance() entries in the contract
+  - the contract's Wasm code
+  Assume averaging 5 second ledger close times.
+  For instance, 535679 LEDGERS would correspond to ~31 DAYS * 24 HOURS * 60 MINUTES * 60 SECONDS / 5 SECONDS average.
+  threshold is a check that ensures that the current TTL of the contract instance is less than the set threshold value.
+  extend_to is the number of ledgers to be added to the current TTL.
+*/
+#[allow(dead_code)]
+const DAY_IN_LEDGERS: u32 = 17280; // One day, assuming 5s per ledger: 24 * 60 * 60 / 5
+#[allow(dead_code)]
+const MAXIMUM_EXTEND_DAYS: u32 = 30; // One month
+#[allow(dead_code)]
+const EXTEND_TO_DAYS: u32 = MAXIMUM_EXTEND_DAYS * DAY_IN_LEDGERS; // Extend TTL to maximum 30 days
+#[allow(dead_code)]
+const BUMP_THRESHOLD: u32 = EXTEND_TO_DAYS - DAY_IN_LEDGERS; // One day threshold
+
+#[allow(dead_code)]
+pub fn extend_contract_ttl(env: Env, threshold: u32, extend_to: u32) {
+    env.storage().instance().extend_ttl(threshold, extend_to);
+}
+
+#[allow(dead_code)]
+pub fn extend_persistence_ttl(env: Env, key: DataKey, threshold: u32, extend_to: u32) {
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, threshold, extend_to);
 }
