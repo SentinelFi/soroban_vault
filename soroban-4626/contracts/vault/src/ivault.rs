@@ -54,4 +54,7 @@ pub trait IPublicVault {
         approve_amount: i128,
         expire_in_days: u32,
     ) -> Result<(), VaultError>;
+    fn is_paused(env: Env) -> bool;
+    fn pause(env: Env) -> Result<bool, ContractError>;
+    fn unpause(env: Env) -> Result<bool, ContractError>;
 }

@@ -10,10 +10,10 @@ use crate::{
     ivault::IPublicVault,
     math::{mul_div, safe_add_i128, safe_add_u32, safe_mul, safe_pow, safe_sub_i128, Rounding},
     storage::{
-        has_administrator, read_administrator, read_asset_address, read_asset_decimals,
-        read_total_shares, read_total_shares_of, write_administrator, write_asset_address,
-        write_asset_decimals, write_asset_name, write_asset_symbol, write_total_shares,
-        write_total_shares_of,
+        has_administrator, is_paused, read_administrator, read_asset_address, read_asset_decimals,
+        read_total_shares, read_total_shares_of, remove_paused, write_administrator,
+        write_asset_address, write_asset_decimals, write_asset_name, write_asset_symbol,
+        write_paused, write_total_shares, write_total_shares_of,
     },
 };
 
@@ -232,6 +232,40 @@ impl IPublicVault for Vault {
         let expiry_ledger: u32 = _calculate_expiry_ledger(&env, expire_in_days)?;
         _approve_allowance(&env, &owner, &spender, approve_amount, expiry_ledger)
     }
+
+    fn is_paused(env: Env) -> bool {
+        is_paused(&env)
+    }
+
+    fn pause(env: Env) -> Result<bool, ContractError> {
+        if has_administrator(&env) {
+            let admin: Address = read_administrator(&env);
+            admin.require_auth();
+            if is_paused(&env) {
+                Err(ContractError::ContractIsAlreadyPaused)
+            } else {
+                write_paused(&env);
+                Ok(true)
+            }
+        } else {
+            Err(ContractError::NotInitialized)
+        }
+    }
+
+    fn unpause(env: Env) -> Result<bool, ContractError> {
+        if has_administrator(&env) {
+            let admin: Address = read_administrator(&env);
+            admin.require_auth();
+            if is_paused(&env) {
+                remove_paused(&env);
+                Ok(true)
+            } else {
+                Err(ContractError::ContractIsAlreadyNotPaused)
+            }
+        } else {
+            Err(ContractError::NotInitialized)
+        }
+    }
 }
 
 // Private functions
@@ -316,6 +350,12 @@ impl Vault {
         write_total_shares_of(&_env, _owner.clone(), &safe_sub_i128(owner_shares, _shares));
     }
 
+    fn _ensure_not_paused(_env: &Env) {
+        if is_paused(_env) {
+            panic!("Contract is currently paused!");
+        }
+    }
+
     fn _deposit(
         _env: &Env,
         _caller: &Address,
@@ -325,6 +365,7 @@ impl Vault {
     ) -> () {
         // Assume that here we receive already valid parameters, i.e. caller is authorized, amounts are validated and so on
         // has enough assets to deposit
+        Self::_ensure_not_paused(_env);
         // Transfer underlying assets from caller to vault
         // This must happen before minting shares to prevent reentrancy issues
         let asset_address: Address = read_asset_address(_env);
@@ -347,6 +388,7 @@ impl Vault {
     ) -> () {
         // Assume that here we receive already valid parameters, i.e. caller is authorized, amounts are validated and so on
         // Verify owner has enough shares
+        Self::_ensure_not_paused(_env);
         // Spend allowance
         if _caller != _owner {
             _spend_allowance(&_env, &_owner, &_caller, _shares).unwrap();

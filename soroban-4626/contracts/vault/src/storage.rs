@@ -84,3 +84,18 @@ pub fn remove_allowance(e: &Env, owner: Address, spender: Address) {
     let key = DataKey::Allowance(owner.clone(), spender.clone());
     e.storage().persistent().remove(&key);
 }
+
+pub fn is_paused(e: &Env) -> bool {
+    let key = DataKey::IsPaused;
+    e.storage().instance().has(&key)
+}
+
+pub fn write_paused(e: &Env) {
+    let key = DataKey::IsPaused;
+    e.storage().instance().set(&key, &())
+}
+
+pub fn remove_paused(e: &Env) {
+    let key = DataKey::IsPaused;
+    e.storage().instance().remove(&key);
+}
