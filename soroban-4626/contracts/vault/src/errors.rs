@@ -16,6 +16,7 @@ pub enum VaultError {
     AllowanceExpired = 10,
     InvalidExpiry = 11,
     InvalidExpiryDays = 12,
+    AdministratorError = 13,
 }
 
 #[contracterror]

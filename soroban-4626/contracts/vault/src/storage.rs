@@ -62,6 +62,16 @@ pub fn read_asset_decimals(e: &Env) -> u32 {
     e.storage().instance().get(&key).unwrap()
 }
 
+pub fn read_asset_symbol(e: &Env) -> String {
+    let key = DataKey::AssetSymbol;
+    e.storage().instance().get(&key).unwrap()
+}
+
+pub fn read_asset_name(e: &Env) -> String {
+    let key = DataKey::AssetName;
+    e.storage().instance().get(&key).unwrap()
+}
+
 pub fn read_asset_address(e: &Env) -> Address {
     let key = DataKey::AssetAddress;
     e.storage().instance().get(&key).unwrap()

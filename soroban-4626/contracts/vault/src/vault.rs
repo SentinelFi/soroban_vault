@@ -11,9 +11,9 @@ use crate::{
     math::{mul_div, safe_add_i128, safe_add_u32, safe_mul, safe_pow, safe_sub_i128, Rounding},
     storage::{
         has_administrator, is_paused, read_administrator, read_asset_address, read_asset_decimals,
-        read_total_shares, read_total_shares_of, remove_paused, write_administrator,
-        write_asset_address, write_asset_decimals, write_asset_name, write_asset_symbol,
-        write_paused, write_total_shares, write_total_shares_of,
+        read_asset_name, read_asset_symbol, read_total_shares, read_total_shares_of, remove_paused,
+        write_administrator, write_asset_address, write_asset_decimals, write_asset_name,
+        write_asset_symbol, write_paused, write_total_shares, write_total_shares_of,
     },
 };
 
@@ -56,48 +56,90 @@ impl IPublicVault for Vault {
         }
     }
 
-    fn administrator_address(env: &Env) -> Address {
-        read_administrator(&env)
+    fn administrator_address(env: &Env) -> Result<Address, ContractError> {
+        if has_administrator(&env) {
+            Ok(read_administrator(&env))
+        } else {
+            Err(ContractError::NotInitialized)
+        }
     }
 
-    fn decimals(env: &Env) -> u32 {
-        let decimals: u32 = read_asset_decimals(&env);
-        let result: u32 = safe_add_u32(decimals, Self::_decimals_offset());
-        result
+    fn asset_decimals(env: &Env) -> Result<u32, ContractError> {
+        if has_administrator(&env) {
+            let decimals: u32 = read_asset_decimals(&env);
+            let result: u32 = safe_add_u32(decimals, Self::_decimals_offset());
+            Ok(result)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
     }
 
-    fn asset(env: &Env) -> Address {
-        let asset_address: Address = read_asset_address(&env);
-        asset_address
+    fn asset_symbol(env: &Env) -> Result<String, ContractError> {
+        if has_administrator(&env) {
+            let symbol: String = read_asset_symbol(&env);
+            Ok(symbol)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
+    }
+
+    fn asset_name(env: &Env) -> Result<String, ContractError> {
+        if has_administrator(&env) {
+            let name: String = read_asset_name(&env);
+            Ok(name)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
+    }
+
+    fn asset_address(env: &Env) -> Result<Address, ContractError> {
+        if has_administrator(&env) {
+            let asset_address: Address = read_asset_address(&env);
+            Ok(asset_address)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
     }
 
     fn contract_address(env: &Env) -> Address {
         env.current_contract_address()
     }
 
-    fn total_assets(env: &Env) -> i128 {
-        let asset_address: Address = read_asset_address(&env);
-        let token_client = token::Client::new(&env, &asset_address);
-        let this_address: Address = Self::contract_address(&env);
-        let balance: i128 = token_client.balance(&this_address);
-        balance
+    fn total_assets(env: &Env) -> Result<i128, ContractError> {
+        if has_administrator(&env) {
+            let asset_address: Address = read_asset_address(&env);
+            let token_client = token::Client::new(&env, &asset_address);
+            let this_address: Address = Self::contract_address(&env);
+            let balance: i128 = token_client.balance(&this_address);
+            Ok(balance)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
     }
 
-    fn total_shares(env: &Env) -> i128 {
-        let total_shares: i128 = read_total_shares(&env);
-        total_shares
+    fn total_shares(env: &Env) -> Result<i128, ContractError> {
+        if has_administrator(&env) {
+            let total_shares: i128 = read_total_shares(&env);
+            Ok(total_shares)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
     }
 
-    fn balance_of(env: &Env, address: Address) -> i128 {
-        let balance: i128 = read_total_shares_of(&env, address.clone());
-        balance
+    fn balance_of_shares(env: &Env, address: Address) -> Result<i128, ContractError> {
+        if has_administrator(&env) {
+            let balance: i128 = read_total_shares_of(&env, address.clone());
+            Ok(balance)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
     }
 
-    fn convert_to_shares(env: &Env, assets: i128) -> i128 {
+    fn convert_to_shares(env: &Env, assets: i128) -> Result<i128, ContractError> {
         Self::_convert_to_shares(env, assets, Rounding::Floor)
     }
 
-    fn convert_to_assets(env: &Env, shares: i128) -> i128 {
+    fn convert_to_assets(env: &Env, shares: i128) -> Result<i128, ContractError> {
         Self::_convert_to_assets(env, shares, Rounding::Floor)
     }
 
@@ -110,28 +152,52 @@ impl IPublicVault for Vault {
     }
 
     fn max_withdraw(env: &Env, owner: Address) -> i128 {
-        let balance: i128 = Self::balance_of(&env, owner);
-        Self::_convert_to_assets(&env, balance, Rounding::Floor)
+        match Self::balance_of_shares(&env, owner) {
+            Ok(value) => match Self::_convert_to_assets(&env, value, Rounding::Floor) {
+                Ok(val) => val,
+                Err(er) => panic!("Call failed with error: {:?}", er),
+            },
+            Err(e) => panic!("Call failed with error: {:?}", e),
+        }
     }
 
     fn max_redeem(env: &Env, owner: Address) -> i128 {
-        Self::balance_of(&env, owner)
+        match Self::balance_of_shares(&env, owner) {
+            Ok(value) => value,
+            Err(e) => panic!("Call failed with error: {:?}", e),
+        }
     }
 
-    fn preview_deposit(env: &Env, assets: i128) -> i128 {
-        Self::_convert_to_shares(&env, assets, Rounding::Floor)
+    fn preview_deposit(env: &Env, assets: i128) -> Result<i128, ContractError> {
+        if has_administrator(&env) {
+            Self::_convert_to_shares(&env, assets, Rounding::Floor)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
     }
 
-    fn preview_mint(env: &Env, shares: i128) -> i128 {
-        Self::_convert_to_assets(&env, shares, Rounding::Ceil)
+    fn preview_mint(env: &Env, shares: i128) -> Result<i128, ContractError> {
+        if has_administrator(&env) {
+            Self::_convert_to_assets(&env, shares, Rounding::Ceil)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
     }
 
-    fn preview_withdraw(env: &Env, assets: i128) -> i128 {
-        Self::_convert_to_shares(&env, assets, Rounding::Ceil)
+    fn preview_withdraw(env: &Env, assets: i128) -> Result<i128, ContractError> {
+        if has_administrator(&env) {
+            Self::_convert_to_shares(&env, assets, Rounding::Ceil)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
     }
 
-    fn preview_redeem(env: &Env, shares: i128) -> i128 {
-        Self::_convert_to_assets(&env, shares, Rounding::Floor)
+    fn preview_redeem(env: &Env, shares: i128) -> Result<i128, ContractError> {
+        if has_administrator(&env) {
+            Self::_convert_to_assets(&env, shares, Rounding::Floor)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
     }
 
     fn deposit(
@@ -140,18 +206,22 @@ impl IPublicVault for Vault {
         caller: Address,
         receiver: Address,
     ) -> Result<i128, VaultError> {
-        caller.require_auth();
-        if assets <= 0 {
-            Err(VaultError::ZeroAssets)
-        } else {
-            let max_assets: i128 = Self::max_deposit(&env, receiver.clone());
-            if assets > max_assets {
-                Err(VaultError::ERC4626ExceededMaxDeposit)
+        if has_administrator(&env) {
+            caller.require_auth();
+            if assets <= 0 {
+                Err(VaultError::ZeroAssets)
             } else {
-                let shares: i128 = Self::preview_deposit(&env, assets);
-                Self::_deposit(&env, &caller, &receiver, assets, shares);
-                Ok(shares)
+                let max_assets: i128 = Self::max_deposit(&env, receiver.clone());
+                if assets > max_assets {
+                    Err(VaultError::ERC4626ExceededMaxDeposit)
+                } else {
+                    let shares: i128 = Self::preview_deposit(&env, assets).unwrap();
+                    Self::_deposit(&env, &caller, &receiver, assets, shares);
+                    Ok(shares)
+                }
             }
+        } else {
+            Err(VaultError::AdministratorError)
         }
     }
 
@@ -161,18 +231,22 @@ impl IPublicVault for Vault {
         caller: Address,
         receiver: Address,
     ) -> Result<i128, VaultError> {
-        caller.require_auth();
-        if shares <= 0 {
-            Err(VaultError::ZeroShares)
-        } else {
-            let max_shares: i128 = Self::max_mint(&env, receiver.clone());
-            if shares > max_shares {
-                Err(VaultError::ERC4626ExceededMaxMint)
+        if has_administrator(&env) {
+            caller.require_auth();
+            if shares <= 0 {
+                Err(VaultError::ZeroShares)
             } else {
-                let assets: i128 = Self::preview_mint(&env, shares);
-                Self::_deposit(&env, &caller, &receiver, assets, shares);
-                Ok(assets)
+                let max_shares: i128 = Self::max_mint(&env, receiver.clone());
+                if shares > max_shares {
+                    Err(VaultError::ERC4626ExceededMaxMint)
+                } else {
+                    let assets: i128 = Self::preview_mint(&env, shares).unwrap();
+                    Self::_deposit(&env, &caller, &receiver, assets, shares);
+                    Ok(assets)
+                }
             }
+        } else {
+            Err(VaultError::AdministratorError)
         }
     }
 
@@ -183,18 +257,22 @@ impl IPublicVault for Vault {
         receiver: Address,
         owner: Address,
     ) -> Result<i128, VaultError> {
-        caller.require_auth();
-        if assets <= 0 {
-            Err(VaultError::ZeroAssets)
-        } else {
-            let max_assets: i128 = Self::max_withdraw(&env, owner.clone());
-            if assets > max_assets {
-                Err(VaultError::ERC4626ExceededMaxWithdraw)
+        if has_administrator(&env) {
+            caller.require_auth();
+            if assets <= 0 {
+                Err(VaultError::ZeroAssets)
             } else {
-                let shares: i128 = Self::preview_withdraw(&env, assets);
-                Self::_withdraw(&env, &caller, &receiver, &owner, assets, shares);
-                Ok(shares)
+                let max_assets: i128 = Self::max_withdraw(&env, owner.clone());
+                if assets > max_assets {
+                    Err(VaultError::ERC4626ExceededMaxWithdraw)
+                } else {
+                    let shares: i128 = Self::preview_withdraw(&env, assets).unwrap();
+                    Self::_withdraw(&env, &caller, &receiver, &owner, assets, shares);
+                    Ok(shares)
+                }
             }
+        } else {
+            Err(VaultError::AdministratorError)
         }
     }
 
@@ -205,18 +283,22 @@ impl IPublicVault for Vault {
         receiver: Address,
         owner: Address,
     ) -> Result<i128, VaultError> {
-        caller.require_auth();
-        if shares <= 0 {
-            Err(VaultError::ZeroShares)
-        } else {
-            let max_shares: i128 = Self::max_redeem(&env, owner.clone());
-            if shares > max_shares {
-                Err(VaultError::ERC4626ExceededMaxRedeem)
+        if has_administrator(&env) {
+            caller.require_auth();
+            if shares <= 0 {
+                Err(VaultError::ZeroShares)
             } else {
-                let assets: i128 = Self::preview_redeem(&env, shares);
-                Self::_withdraw(&env, &caller, &receiver, &owner, assets, shares);
-                Ok(assets)
+                let max_shares: i128 = Self::max_redeem(&env, owner.clone());
+                if shares > max_shares {
+                    Err(VaultError::ERC4626ExceededMaxRedeem)
+                } else {
+                    let assets: i128 = Self::preview_redeem(&env, shares).unwrap();
+                    Self::_withdraw(&env, &caller, &receiver, &owner, assets, shares);
+                    Ok(assets)
+                }
             }
+        } else {
+            Err(VaultError::AdministratorError)
         }
     }
 
@@ -227,9 +309,17 @@ impl IPublicVault for Vault {
         approve_amount: i128,
         expire_in_days: u32,
     ) -> Result<(), VaultError> {
-        owner.require_auth();
-        let expiry_ledger: u32 = _calculate_expiry_ledger(&env, expire_in_days)?;
-        _approve_allowance(&env, &owner, &spender, approve_amount, expiry_ledger)
+        if has_administrator(&env) {
+            if approve_amount <= 0 {
+                Err(VaultError::InvalidAmount)
+            } else {
+                owner.require_auth();
+                let expiry_ledger: u32 = _calculate_expiry_ledger(&env, expire_in_days)?;
+                _approve_allowance(&env, &owner, &spender, approve_amount, expiry_ledger)
+            }
+        } else {
+            Err(VaultError::AdministratorError)
+        }
     }
 
     fn transfer_shares(
@@ -238,26 +328,34 @@ impl IPublicVault for Vault {
         receiver: Address,
         shares_amount: i128,
     ) -> Result<bool, VaultError> {
-        owner.require_auth();
-        let owner_shares: i128 = read_total_shares_of(&env, owner.clone());
-        if owner_shares < shares_amount {
-            Err(VaultError::InvalidAmount)
+        if has_administrator(&env) {
+            owner.require_auth();
+            if shares_amount <= 0 {
+                Err(VaultError::InvalidAmount)
+            } else {
+                let owner_shares: i128 = read_total_shares_of(&env, owner.clone());
+                if owner_shares < shares_amount {
+                    Err(VaultError::InvalidAmount)
+                } else {
+                    // Change owner's and receiver's token balances
+                    // Total shares should remain unchanged
+                    let receiver_shares: i128 = read_total_shares_of(&env, receiver.clone());
+                    write_total_shares_of(
+                        &env,
+                        owner.clone(),
+                        &safe_sub_i128(owner_shares, shares_amount),
+                    );
+                    write_total_shares_of(
+                        &env,
+                        receiver.clone(),
+                        &safe_add_i128(receiver_shares, shares_amount),
+                    );
+                    Self::_emit_transfer_shares_event(&env, &owner, &receiver, shares_amount);
+                    Ok(true)
+                }
+            }
         } else {
-            // Change owner's and receiver's token balances
-            // Total shares should remain unchanged
-            let receiver_shares: i128 = read_total_shares_of(&env, receiver.clone());
-            write_total_shares_of(
-                &env,
-                owner.clone(),
-                &safe_sub_i128(owner_shares, shares_amount),
-            );
-            write_total_shares_of(
-                &env,
-                receiver.clone(),
-                &safe_add_i128(receiver_shares, shares_amount),
-            );
-            Self::_emit_transfer_shares_event(&env, &owner, &receiver, shares_amount);
-            Ok(true)
+            Err(VaultError::AdministratorError)
         }
     }
 
@@ -325,28 +423,44 @@ impl Vault {
         result
     }
 
-    fn _convert_to_shares(env: &Env, assets: i128, rounding: Rounding) -> i128 {
-        mul_div(
-            assets,
-            safe_add_i128(
-                Self::total_shares(env),
-                safe_pow(10, Self::_decimals_offset()),
-            ),
-            safe_add_i128(Self::total_assets(env), 1),
-            rounding,
-        )
+    fn _convert_to_shares(
+        env: &Env,
+        assets: i128,
+        rounding: Rounding,
+    ) -> Result<i128, ContractError> {
+        if assets <= 0 {
+            Ok(0) // Assume it is fine to return zero here
+        } else {
+            let tot_shares: i128 = Self::total_shares(env)?;
+            let tot_assets: i128 = Self::total_assets(env)?;
+            let result: i128 = mul_div(
+                assets,
+                safe_add_i128(tot_shares, safe_pow(10, Self::_decimals_offset())),
+                safe_add_i128(tot_assets, 1),
+                rounding,
+            );
+            Ok(result)
+        }
     }
 
-    fn _convert_to_assets(env: &Env, shares: i128, rounding: Rounding) -> i128 {
-        mul_div(
-            shares,
-            safe_add_i128(Self::total_assets(env), 1),
-            safe_add_i128(
-                Self::total_shares(env),
-                safe_pow(10, Self::_decimals_offset()),
-            ),
-            rounding,
-        )
+    fn _convert_to_assets(
+        env: &Env,
+        shares: i128,
+        rounding: Rounding,
+    ) -> Result<i128, ContractError> {
+        if shares <= 0 {
+            Ok(0) // Assume it is fine to return zero here
+        } else {
+            let tot_shares: i128 = Self::total_shares(env)?;
+            let tot_assets: i128 = Self::total_assets(env)?;
+            let result: i128 = mul_div(
+                shares,
+                safe_add_i128(tot_assets, 1),
+                safe_add_i128(tot_shares, safe_pow(10, Self::_decimals_offset())),
+                rounding,
+            );
+            Ok(result)
+        }
     }
 
     /*
@@ -371,13 +485,7 @@ impl Vault {
 
     fn _burn_shares(_env: &Env, _owner: &Address, _shares: i128) -> () {
         let owner_shares = read_total_shares_of(&_env, _owner.clone());
-        // if owner_shares < _shares { // already veified at higher level?
-        //Err(VaultError::InsufficientShares);
-        //}
         let current_total = read_total_shares(&_env);
-        //if current_total < _shares {
-        //Err(VaultError::InsufficientShares);
-        //}
         write_total_shares(&_env, &safe_sub_i128(current_total, _shares));
         write_total_shares_of(&_env, _owner.clone(), &safe_sub_i128(owner_shares, _shares));
     }
@@ -396,7 +504,6 @@ impl Vault {
         _shares: i128,
     ) -> () {
         // Assume that here we receive already valid parameters, i.e. caller is authorized, amounts are validated and so on
-        // has enough assets to deposit
         Self::_ensure_not_paused(_env);
         // Transfer underlying assets from caller to vault
         // This must happen before minting shares to prevent reentrancy issues
@@ -419,7 +526,6 @@ impl Vault {
         _shares: i128,
     ) -> () {
         // Assume that here we receive already valid parameters, i.e. caller is authorized, amounts are validated and so on
-        // Verify owner has enough shares
         Self::_ensure_not_paused(_env);
         // Spend allowance
         if _caller != _owner {
