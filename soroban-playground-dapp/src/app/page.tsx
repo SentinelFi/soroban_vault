@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import SendForm from "../components/SendForm";
 
 import * as StellarSdk from "@stellar/stellar-sdk";
-import { Server } from "@stellar/stellar-sdk/rpc";
+import { SorobanRpc } from "@stellar/stellar-sdk";
 
 import {
   isConnected,
@@ -70,7 +70,7 @@ export default function Home() {
       const timeoutInSeconds = 30;
       const networkPhrase = StellarSdk.Networks.TESTNET;
 
-      const server = new Server(SOROBAN_RPC_URL);
+      const server = new SorobanRpc.Server(SOROBAN_RPC_URL);
       const sourceAccount = await server.getAccount(publicKey);
 
       const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {

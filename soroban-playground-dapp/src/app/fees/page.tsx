@@ -16,6 +16,7 @@ interface FeeType {
   modeFee: string;
   minFee: string;
   feeChargedP99: string;
+  feeChargedP90: string;
 }
 
 export default function Fees() {
@@ -107,6 +108,7 @@ export default function Fees() {
         modeFee: fees.max_fee.mode,
         minFee: fees.max_fee.min,
         feeChargedP99: fees.fee_charged.p99,
+        feeChargedP90: fees.fee_charged.p90,
       };
     } catch (error) {
       console.error("Error fetching fee:", error);
@@ -127,10 +129,10 @@ export default function Fees() {
             (.0000001 XLM).
           </p>
           <button
-            className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded mt-4"
+            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-4"
             onClick={() => fetchFee()}
           >
-            Refetch Fee
+            Refetch Fees
           </button>
           {feeValues && (
             <div className="mt-4">
@@ -150,6 +152,10 @@ export default function Fees() {
                 Fee Charged P99 (99th percentile):
               </h2>
               <p>{feeValues.feeChargedP99}</p>
+              <h2 className="text-xl text-gray-500">
+                Fee Charged P90 (90th percentile):
+              </h2>
+              <p>{feeValues.feeChargedP90}</p>
             </div>
           )}
         </>

@@ -7,7 +7,12 @@
 //         file = "../../target/wasm32-unknown-unknown/release/vault.optimized.wasm"
 //     );
 // }
-use soroban_sdk::{contract, contractimpl /*Address, Env*/};
+use soroban_sdk::{contract, contractimpl, contractmeta /*Address, Env*/};
+
+contractmeta!(
+    key = "Market Maker",
+    val = "Implementation of the Market Maker using vaults in Soroban"
+);
 
 #[contract]
 pub struct MarketContract;
