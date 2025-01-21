@@ -21,6 +21,9 @@ const Nav = () => {
       <Link href="/faucet" className="mr-4 text-blue-500 hover:text-blue-700">
         FAUCET
       </Link>
+      <Link href="/image" className="mr-4 text-blue-500 hover:text-blue-700">
+        IMAGE
+      </Link>
     </nav>
   );
 };

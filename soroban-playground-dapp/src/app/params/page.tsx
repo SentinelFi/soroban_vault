@@ -27,7 +27,7 @@ import {
   EnumKey,
   SorobanTypeConverter,
   StructData,
-} from "./SorobanTypeConverter";
+} from "../../utils/SorobanTypeConverter";
 
 // Replace with the actual contract ID and network details
 const CONTRACT_ID = "CDL7PKHEPE4FLXTSRQA5GKITESYJAAZD77PTV7BTNEP7G4QH32NQFLM7";
