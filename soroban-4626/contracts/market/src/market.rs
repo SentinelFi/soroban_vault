@@ -20,9 +20,9 @@
  * USE AT YOUR OWN RISK.
  */
 // Unix time converter, example: https://www.unixtimestamp.com/
-// Market lifecycle: Live -> Locked -> Liquidated or Matured
+// Market lifecycle: Live -> Locked -> Liquidate or Mature -> Liquidated or Matured
 use soroban_sdk::{
-    contract, contractimpl, contractmeta, symbol_short, Address, Env, String, Symbol,
+    contract, contractimpl, contractmeta, symbol_short, token, Address, Env, String, Symbol,
 };
 
 use vault::vault::VaultContractClient;
@@ -276,7 +276,7 @@ impl MarketContract {
             return Err(MarketError::NotInitialized);
         }
         if !has_liquidated_time(&env) {
-            return Err(MarketError::NotLiquidated);
+            return Err(MarketError::NotLiquidate);
         }
         Ok(read_liquidated_time(&env))
     }
@@ -286,7 +286,7 @@ impl MarketContract {
             return Err(MarketError::NotInitialized);
         }
         if !has_matured_time(&env) {
-            return Err(MarketError::NotMatured);
+            return Err(MarketError::NotMature);
         }
         Ok(read_matured_time(&env))
     }
@@ -309,6 +309,28 @@ impl MarketContract {
             return Err(MarketError::LastKeeperTimeNotSet);
         }
         Ok(read_last_keeper_time(&env))
+    }
+
+    pub fn lock(env: Env) -> Result<bool, MarketError> {
+        // Keeper bots should call this function to lock the vaults if possible
+        // Locks vaults to prevent new deposits and withdrawals
+        // Can be locked if status is live and current_time >= event_time - lock_seconds
+        // Prevent from locking when already matured or liquidated
+        if !has_administrator(&env) {
+            return Err(MarketError::NotInitialized);
+        }
+        let current_timestamp: u64 = env.ledger().timestamp();
+        write_last_keeper_time(&env, &current_timestamp);
+        Self::_ensure_not_paused(&env)?;
+        let event_time: u64 = read_event_timestamp(&env);
+        let lock_seconds: u64 = read_lock_seconds(&env);
+        if current_timestamp < event_time - lock_seconds {
+            return Err(MarketError::LockTooEarly);
+        }
+        Self::_ensure_not_liquidated_or_matured_or_locked(&env)?;
+        write_status(&env, &MarketStatus::LOCKED);
+        // TODO: actually lock vaults
+        return Ok(true);
     }
 
     pub fn bump(
@@ -345,12 +367,12 @@ impl MarketContract {
                     // Can be liquidated
                     if e > expected_event_time + EVENT_THRESHOLD_IN_SECONDS {
                         write_liquidated_time(&env, &current_timestamp); // Also persist actual event time?
-                        write_status(&env, &MarketStatus::LIQUIDATED);
+                        write_status(&env, &MarketStatus::LIQUIDATE);
                         return Ok(true);
                     } else {
                         // Can be matured
                         write_matured_time(&env, &current_timestamp); // Also persist actual event time?
-                        write_status(&env, &MarketStatus::MATURED);
+                        write_status(&env, &MarketStatus::MATURE);
                         return Ok(true);
                     }
                 }
@@ -363,7 +385,7 @@ impl MarketContract {
                     // Can be matured
                     if e >= expected_event_time + EVENT_THRESHOLD_IN_SECONDS {
                         write_matured_time(&env, &current_timestamp); // Also persist actual event time?
-                        write_status(&env, &MarketStatus::MATURED);
+                        write_status(&env, &MarketStatus::MATURE);
                         return Ok(true);
                     } else {
                         // Can be ignored
@@ -395,29 +417,33 @@ impl MarketContract {
 
     pub fn auto_maturity(env: Env) -> Result<bool, MarketError> {
         // Trigger automatic maturity event (can be called by any keeper if auto exercising was enabled)
+        // Maturity means that ...
         // Validation
         if !has_administrator(&env) {
             return Err(MarketError::NotInitialized);
         }
-        let oracle: Address = read_oracle(&env);
-        oracle.require_auth();
+        let current_timestamp: u64 = env.ledger().timestamp();
+        write_last_keeper_time(&env, &current_timestamp);
         Self::_ensure_not_paused(&env)?;
         if !read_is_automatic(&env) {
             return Err(MarketError::WrongExercising);
         }
-        let current_timestamp: u64 = env.ledger().timestamp();
-        let event_timestamp: u64 = read_event_timestamp(&env);
-        // TODO: Improve the check if possible
-        if current_timestamp < event_timestamp {
-            return Err(MarketError::MaturityTooEarly);
+        // Check if can be matured. This also checks if it already matured or liquidated
+        if read_status(&env) != MarketStatus::MATURE {
+            return Err(MarketError::NotMature);
         }
-        // Check if already matured or liquidated
-        Self::_ensure_not_liquidated_or_matured(&env)?;
-        // Change Status
+        // Set status to inform others that the market has matured
         write_status(&env, &MarketStatus::MATURED);
-        write_last_keeper_time(&env, &current_timestamp);
-        write_matured_time(&env, &current_timestamp);
         // TODO: Transfer assets between vaults and charge the commission fee if > 0
+        // If liquidation occurs: Risk collateral is transferred to the Hedge Vault.
+        // If maturity is triggered: Hedge collateral is transferred to the Risk Vault.
+        let hedge: Address = read_hedge_vault(&env);
+        let risk: Address = read_risk_vault(&env);
+        let asset_address: Address = read_asset(&env);
+        let token_client = token::Client::new(&env, &asset_address);
+        let allowance: i128 = token_client.allowance(&hedge, &Self::current_contract_address(env)); // TODO: check allowance first
+        let balance: i128 = token_client.balance(&hedge);
+        token_client.transfer(&hedge, &risk, &balance);
         // TODO: unlock withdrawal of one vault
         // TODO: Emit event
         Ok(true)
@@ -505,11 +531,25 @@ impl MarketContract {
 
     fn _ensure_not_liquidated_or_matured(env: &Env) -> Result<(), MarketError> {
         let status: MarketStatus = read_status(&env);
-        if status == MarketStatus::LIQUIDATED {
+        if status == MarketStatus::LIQUIDATED || status == MarketStatus::LIQUIDATE {
             return Err(MarketError::AlreadyLiquidated);
         }
-        if status == MarketStatus::MATURED {
+        if status == MarketStatus::MATURED || status == MarketStatus::MATURE {
             return Err(MarketError::AlreadyMatured);
+        }
+        Ok(())
+    }
+
+    fn _ensure_not_liquidated_or_matured_or_locked(env: &Env) -> Result<(), MarketError> {
+        let status: MarketStatus = read_status(&env);
+        if status == MarketStatus::LIQUIDATED || status == MarketStatus::LIQUIDATE {
+            return Err(MarketError::AlreadyLiquidated);
+        }
+        if status == MarketStatus::MATURED || status == MarketStatus::MATURE {
+            return Err(MarketError::AlreadyMatured);
+        }
+        if status == MarketStatus::LOCKED {
+            return Err(MarketError::AlreadyLocked);
         }
         Ok(())
     }
