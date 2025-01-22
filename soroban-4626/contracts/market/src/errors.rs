@@ -23,4 +23,7 @@ pub enum MarketError {
     NotMatured = 17,
     LastKeeperTimeNotSet = 18,
     LastOracleTimeNotSet = 19,
+    AlreadyMatured = 20,
+    AlreadyLiquidated = 21,
+    EventTimeIsRequired = 22,
 }

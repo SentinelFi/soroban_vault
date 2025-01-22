@@ -57,6 +57,7 @@ const MIN_COMMISSION_FEE: u32 = 0;
 const MAX_COMMISSION_FEE: u32 = 100;
 const MIN_LOCK_IN_SECONDS: u64 = 0;
 const MAX_LOCK_IN_SECONDS: u64 = 604800; // 7 days
+const EVENT_THRESHOLD_IN_SECONDS: u64 = 18000; // 5 hours // TODO: configurable on init
 
 #[allow(dead_code)]
 #[contractimpl]
@@ -310,18 +311,67 @@ impl MarketContract {
         Ok(read_last_keeper_time(&env))
     }
 
-    pub fn bump(env: Env) -> Result<bool, MarketError> {
-        // External oracle should call this function to send bumps (status updates)
+    pub fn bump(
+        env: Env,
+        event_occurred: bool,
+        event_time: Option<u64>,
+    ) -> Result<bool, MarketError> {
+        // Trusted oracle should call this function to send bumps (status updates)
+        // Set event_occurred to true if the market event has already happened.
+        // Set event_time to when the event has happened. Optional if event_occurred is false.
+        // If event occurred and event time > (expected event time + some threshold), then change status to liquidated.
+        // If event occurred and event time <= (expected event time + some threshold), then change status to matured.
+        // If event didn't occurr and event time >= (expected event time + some threshold), then change status to matured.
+        // If event didn't occurr and event time < (expected event time + some threshold), then ignore.
+        // If event occurred and no event time sent, then return an error.
+        // If event didn't occurr and no event time sent, then ignore.
         if !has_administrator(&env) {
             return Err(MarketError::NotInitialized);
         }
+        let current_timestamp: u64 = env.ledger().timestamp();
+        write_last_oracle_time(&env, &current_timestamp);
         let oracle: Address = read_oracle(&env);
         oracle.require_auth();
         Self::_ensure_not_paused(&env)?;
-        // TODO: check state updates
-        let current_timestamp: u64 = env.ledger().timestamp();
-        write_last_oracle_time(&env, &current_timestamp);
-        Ok(true)
+        // Check if already matured or liquidated
+        Self::_ensure_not_liquidated_or_matured(&env)?;
+        // Check if liquidation or maturity should happen
+        let expected_event_time: u64 = read_event_timestamp(&env);
+        if event_occurred {
+            match event_time {
+                // Invalid bump data
+                None => return Err(MarketError::EventTimeIsRequired),
+                Some(e) => {
+                    // Can be liquidated
+                    if e > expected_event_time + EVENT_THRESHOLD_IN_SECONDS {
+                        write_liquidated_time(&env, &current_timestamp); // Also persist actual event time?
+                        write_status(&env, &MarketStatus::LIQUIDATED);
+                        return Ok(true);
+                    } else {
+                        // Can be matured
+                        write_matured_time(&env, &current_timestamp); // Also persist actual event time?
+                        write_status(&env, &MarketStatus::MATURED);
+                        return Ok(true);
+                    }
+                }
+            }
+        } else {
+            match event_time {
+                // Such bump can be ignored
+                None => return Ok(true),
+                Some(e) => {
+                    // Can be matured
+                    if e >= expected_event_time + EVENT_THRESHOLD_IN_SECONDS {
+                        write_matured_time(&env, &current_timestamp); // Also persist actual event time?
+                        write_status(&env, &MarketStatus::MATURED);
+                        return Ok(true);
+                    } else {
+                        // Can be ignored
+                        return Ok(true);
+                    }
+                }
+            }
+        }
     }
 
     pub fn auto_liquidation(env: Env) -> Result<bool, MarketError> {
@@ -361,6 +411,8 @@ impl MarketContract {
         if current_timestamp < event_timestamp {
             return Err(MarketError::MaturityTooEarly);
         }
+        // Check if already matured or liquidated
+        Self::_ensure_not_liquidated_or_matured(&env)?;
         // Change Status
         write_status(&env, &MarketStatus::MATURED);
         write_last_keeper_time(&env, &current_timestamp);
@@ -449,5 +501,16 @@ impl MarketContract {
             true => Err(MarketError::ContractIsAlreadyPaused),
             false => Ok(()),
         }
+    }
+
+    fn _ensure_not_liquidated_or_matured(env: &Env) -> Result<(), MarketError> {
+        let status: MarketStatus = read_status(&env);
+        if status == MarketStatus::LIQUIDATED {
+            return Err(MarketError::AlreadyLiquidated);
+        }
+        if status == MarketStatus::MATURED {
+            return Err(MarketError::AlreadyMatured);
+        }
+        Ok(())
     }
 }
