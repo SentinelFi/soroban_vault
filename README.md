@@ -8,6 +8,8 @@ https://developers.stellar.org/docs/build/smart-contracts/getting-started/setup
 
 https://okashi.dev/
 
+VS Code Extension: https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer
+
 ---
 
 Identity (address):
