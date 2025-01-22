@@ -1,5 +1,25 @@
+/**
+ * @notice DISCLAIMER - PLEASE READ CAREFULLY
+ * ==========================================
+ * This smart contract is provided "as is" and "as available", at your own risk, without warranty of any kind.
+ *
+ * By deploying, interacting with, or using this smart contract in any way, you acknowledge and agree that:
+ * - This code may contain bugs, errors, or security vulnerabilities unknown to the developers
+ * - The code may function unexpectedly or become deprecated
+ * - You assume all risks associated with using this code including, but not limited to:
+ *    - Complete loss of funds or tokens
+ *    - Smart contract exploits or vulnerabilities
+ *    - Unexpected behavior due to code errors
+ *    - Economic or financial losses
+ * - Neither the developers nor any associated parties:
+ *    - Make any warranties about the code's reliability, accuracy, or fitness for any purpose
+ *    - Are responsible for any losses or damages arising from its use
+ *    - Guarantee the continuous functionality or maintenance of the code
+ *
+ * CONDUCT YOUR OWN DUE DILIGENCE AND SEEK PROFESSIONAL ADVICE BEFORE USING THIS CODE.
+ * USE AT YOUR OWN RISK.
+ */
 // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/extensions/ERC4626.sol
-
 use soroban_sdk::{
     contract, contractclient, contractimpl, contractmeta, symbol_short, token, Address, Env, String,
 };
