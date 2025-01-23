@@ -395,7 +395,7 @@ impl MarketContract {
     }
 
     /*
-    NOTE: This function is need needed as vaults can lock themselves, when admin feeds them with time stamps.
+    NOTE: This function is NOT needed as vaults can lock themselves, when admin feeds them with time stamps.
     pub fn lock(env: Env) -> Result<bool, MarketError> {
         // Keeper bots should call this function to lock the vaults if possible
         // Locks vaults to prevent new deposits and withdrawals
