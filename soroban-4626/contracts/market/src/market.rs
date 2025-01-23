@@ -32,14 +32,15 @@ use crate::{
     errors::MarketError,
     keys::{MarketRisk, MarketStatus},
     storage::{
-        has_administrator, has_last_keeper_time, has_last_oracle_time, has_liquidated_time,
-        has_matured_time, is_paused, read_administrator, read_asset, read_commission_fee,
-        read_description, read_event_threshold_seconds, read_event_timestamp, read_hedge_vault,
+        has_actual_event_timestamp, has_administrator, has_last_keeper_time, has_last_oracle_time,
+        has_liquidated_time, has_matured_time, is_paused, read_actual_event_timestamp,
+        read_administrator, read_asset, read_commission_fee, read_description,
+        read_event_threshold_seconds, read_event_timestamp, read_hedge_vault,
         read_initialized_time, read_is_automatic, read_last_keeper_time, read_last_oracle_time,
         read_liquidated_time, read_lock_seconds, read_matured_time, read_name, read_oracle,
         read_risk_score, read_risk_vault, read_status, read_unlock_seconds, remove_is_paused,
-        write_administrator, write_asset, write_commission_fee, write_description,
-        write_event_threshold_seconds, write_event_timestamp, write_hedge_vault,
+        write_actual_event_timestamp, write_administrator, write_asset, write_commission_fee,
+        write_description, write_event_threshold_seconds, write_event_timestamp, write_hedge_vault,
         write_initialized_time, write_is_automatic, write_is_paused, write_last_keeper_time,
         write_last_oracle_time, write_liquidated_time, write_lock_seconds, write_matured_time,
         write_name, write_oracle, write_risk_score, write_risk_vault, write_status,
@@ -241,11 +242,21 @@ impl MarketContract {
         Ok(read_initialized_time(&env))
     }
 
-    pub fn time_of_event(env: Env) -> Result<u64, MarketError> {
+    pub fn expected_time_of_event(env: Env) -> Result<u64, MarketError> {
         if !has_administrator(&env) {
             return Err(MarketError::NotInitialized);
         }
         Ok(read_event_timestamp(&env))
+    }
+
+    pub fn actual_time_of_event(env: Env) -> Result<u64, MarketError> {
+        if !has_administrator(&env) {
+            return Err(MarketError::NotInitialized);
+        }
+        if !has_actual_event_timestamp(&env) {
+            return Err(MarketError::ActualEventTimeNotSet);
+        }
+        Ok(read_actual_event_timestamp(&env))
     }
 
     pub fn time_until_event(env: Env) -> Result<u64, MarketError> {
@@ -455,12 +466,14 @@ impl MarketContract {
                 Some(e) => {
                     // Can be liquidated
                     if e > expected_event_time.checked_add(event_threshold).unwrap() {
-                        write_liquidated_time(&env, &current_timestamp); // Also persist actual event time?
+                        write_liquidated_time(&env, &current_timestamp);
+                        write_actual_event_timestamp(&env, &e);
                         write_status(&env, &MarketStatus::LIQUIDATE);
                         return Ok(true);
                     } else {
                         // Can be matured
-                        write_matured_time(&env, &current_timestamp); // Also persist actual event time?
+                        write_matured_time(&env, &current_timestamp);
+                        write_actual_event_timestamp(&env, &e);
                         write_status(&env, &MarketStatus::MATURE);
                         return Ok(true);
                     }
@@ -473,7 +486,8 @@ impl MarketContract {
                 Some(e) => {
                     // Can be matured
                     if e >= expected_event_time.checked_add(event_threshold).unwrap() {
-                        write_matured_time(&env, &current_timestamp); // Also persist actual event time?
+                        write_matured_time(&env, &current_timestamp);
+                        write_actual_event_timestamp(&env, &e);
                         write_status(&env, &MarketStatus::MATURE);
                         return Ok(true);
                     } else {
@@ -499,7 +513,7 @@ impl MarketContract {
         }
         // Set status to inform others that the market has matured
         write_status(&env, &MarketStatus::MATURED);
-        // TODO: Transfer assets between vaults and charge the commission fee if > 0
+        // Transfer assets between vaults and charge the commission fee.
         // If liquidation occurs: Risk collateral is transferred to the Hedge Vault.
         // If maturity is triggered: Hedge collateral is transferred to the Risk Vault.
         let hedge: Address = read_hedge_vault(&env);
@@ -526,7 +540,7 @@ impl MarketContract {
         }
         // Set status to inform others that the market has matured
         write_status(&env, &MarketStatus::LIQUIDATED);
-        // TODO: Transfer assets between vaults and charge the commission fee if > 0
+        // Transfer assets between vaults and charge the commission fee.
         // If liquidation occurs: Risk collateral is transferred to the Hedge Vault.
         // If maturity is triggered: Hedge collateral is transferred to the Risk Vault.
         let hedge: Address = read_hedge_vault(&env);
@@ -651,8 +665,7 @@ impl MarketContract {
         from_vault: &Address,
         to_vault: &Address,
     ) -> Result<(), MarketError> {
-        //from.require_auth();
-        // Note: vaults need to enable full transfer allowance of the underlying asset between each other
+        // Note: before calling this function, make sure that vaults have enabled full transfer allowance of the underlying asset between each other
         let token_client = token::Client::new(&env, &asset_address);
         let allowance: i128 = token_client.allowance(&from_vault, &to_vault);
         let balance: i128 = token_client.balance(&from_vault);

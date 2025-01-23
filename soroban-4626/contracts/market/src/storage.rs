@@ -199,6 +199,21 @@ pub fn write_event_timestamp(e: &Env, time: &u64) {
     e.storage().instance().set(&key, time);
 }
 
+pub fn has_actual_event_timestamp(e: &Env) -> bool {
+    let key = MarketDataKey::ActualEventUnixTimestamp;
+    e.storage().instance().has(&key)
+}
+
+pub fn read_actual_event_timestamp(e: &Env) -> u64 {
+    let key = MarketDataKey::ActualEventUnixTimestamp;
+    e.storage().instance().get(&key).unwrap()
+}
+
+pub fn write_actual_event_timestamp(e: &Env, time: &u64) {
+    let key = MarketDataKey::ActualEventUnixTimestamp;
+    e.storage().instance().set(&key, time);
+}
+
 pub fn read_lock_seconds(e: &Env) -> u64 {
     let key = MarketDataKey::LockInSeconds;
     e.storage().instance().get(&key).unwrap()
