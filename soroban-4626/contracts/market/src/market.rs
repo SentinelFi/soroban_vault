@@ -181,6 +181,9 @@ impl MarketContract {
         write_event_threshold_seconds(&env, &data.event_threshold_in_seconds);
         write_unlock_seconds(&env, &data.unlock_period_in_seconds);
 
+        // Emit Event
+        Self::_emit_init_event(&env, &data.admin_address, data.name, current_timestamp);
+
         // Return Result
         Ok(true)
     }
@@ -414,10 +417,10 @@ impl MarketContract {
         // If event didn't occurr and no event time sent, then ignore.
         // Note that oracles can only set the status to 'can liquidate' or 'can mature'. The actual liquidation or maturity action is done by keepers.
         Self::check_is_initialized(&env)?;
-        let current_timestamp: u64 = env.ledger().timestamp();
-        write_last_oracle_time(&env, &current_timestamp);
         let oracle: Address = read_oracle(&env);
         oracle.require_auth();
+        let current_timestamp: u64 = env.ledger().timestamp();
+        write_last_oracle_time(&env, &current_timestamp);
         Self::ensure_not_paused(&env)?;
         // Check if already matured or liquidated
         Self::ensure_not_liquidated_or_matured(&env)?;
@@ -434,12 +437,26 @@ impl MarketContract {
                         write_liquidated_time(&env, &current_timestamp);
                         write_actual_event_timestamp(&env, &e);
                         write_status(&env, &MarketStatus::LIQUIDATE);
+                        Self::emit_can_liquidate_event(
+                            &env,
+                            &read_hedge_vault(&env),
+                            &read_risk_vault(&env),
+                            read_name(&env),
+                            current_timestamp,
+                        );
                         return Ok(true);
                     } else {
                         // Can be matured
                         write_matured_time(&env, &current_timestamp);
                         write_actual_event_timestamp(&env, &e);
                         write_status(&env, &MarketStatus::MATURE);
+                        Self::emit_can_mature_event(
+                            &env,
+                            &read_hedge_vault(&env),
+                            &read_risk_vault(&env),
+                            read_name(&env),
+                            current_timestamp,
+                        );
                         return Ok(true);
                     }
                 }
@@ -454,6 +471,13 @@ impl MarketContract {
                         write_matured_time(&env, &current_timestamp);
                         write_actual_event_timestamp(&env, &e);
                         write_status(&env, &MarketStatus::MATURE);
+                        Self::emit_can_mature_event(
+                            &env,
+                            &read_hedge_vault(&env),
+                            &read_risk_vault(&env),
+                            read_name(&env),
+                            current_timestamp,
+                        );
                         return Ok(true);
                     } else {
                         // Can be ignored
@@ -627,16 +651,7 @@ impl MarketContract {
         admin.require_auth();
         if is_paused(&env) {
             remove_is_paused(&env);
-            let hedge: Address = read_hedge_vault(&env);
-            let risk: Address = read_risk_vault(&env);
-            let hedge_vault = VaultContractClient::new(&env, &hedge);
-            let risk_vault = VaultContractClient::new(&env, &risk);
-            _ = hedge_vault
-                .try_unpause()
-                .map_err(|_| MarketError::VaultUnpauseFailed)?;
-            _ = risk_vault
-                .try_unpause()
-                .map_err(|_| MarketError::VaultUnpauseFailed)?;
+            _ = Self::unlock_vaults(&env)?;
             return Ok(true);
         }
         Err(MarketError::ContractIsAlreadyUnpaused)
@@ -741,7 +756,7 @@ impl MarketContract {
     }
 
     fn lock_vaults(env: &Env) -> Result<bool, MarketError> {
-        // This will work if called only by admin
+        // This will work if called only by admin. Used when market contract is pausing.
         let hedge: Address = read_hedge_vault(&env);
         let risk: Address = read_risk_vault(&env);
         let hedge_vault = VaultContractClient::new(&env, &hedge);
@@ -752,6 +767,21 @@ impl MarketContract {
         _ = risk_vault
             .try_pause()
             .map_err(|_| MarketError::VaultPauseFailed)?;
+        Ok(true)
+    }
+
+    fn unlock_vaults(env: &Env) -> Result<bool, MarketError> {
+        // This will work if called only by admin. Used when market contract is unpausing.
+        let hedge: Address = read_hedge_vault(&env);
+        let risk: Address = read_risk_vault(&env);
+        let hedge_vault = VaultContractClient::new(&env, &hedge);
+        let risk_vault = VaultContractClient::new(&env, &risk);
+        _ = hedge_vault
+            .try_unpause()
+            .map_err(|_| MarketError::VaultUnpauseFailed)?;
+        _ = risk_vault
+            .try_unpause()
+            .map_err(|_| MarketError::VaultUnpauseFailed)?;
         Ok(true)
     }
 
@@ -774,6 +804,33 @@ impl MarketContract {
         timestamp: u64,
     ) {
         let topics = (symbol_short!("liquidate"), hedge, risk);
+        env.events().publish(topics, (name, timestamp));
+    }
+
+    fn emit_can_mature_event(
+        env: &Env,
+        hedge: &Address,
+        risk: &Address,
+        name: String,
+        timestamp: u64,
+    ) {
+        let topics = (symbol_short!("bumpmat"), hedge, risk);
+        env.events().publish(topics, (name, timestamp));
+    }
+
+    fn emit_can_liquidate_event(
+        env: &Env,
+        hedge: &Address,
+        risk: &Address,
+        name: String,
+        timestamp: u64,
+    ) {
+        let topics = (symbol_short!("bumpliq"), hedge, risk);
+        env.events().publish(topics, (name, timestamp));
+    }
+
+    fn _emit_init_event(env: &Env, admin: &Address, name: String, timestamp: u64) {
+        let topics = (symbol_short!("init"), admin);
         env.events().publish(topics, (name, timestamp));
     }
 }
