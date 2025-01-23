@@ -486,10 +486,12 @@ impl MarketContract {
     }
 
     pub fn mature(env: Env) -> Result<bool, MarketError> {
+        // Anyone can and is even encouraged to call this function.
         if !has_administrator(&env) {
             return Err(MarketError::NotInitialized);
         }
         let current_timestamp: u64 = env.ledger().timestamp();
+        write_last_keeper_time(&env, &current_timestamp);
         Self::_ensure_not_paused(&env)?;
         // Check if can be matured or liquidated. This also checks if it already matured or liquidated
         if read_status(&env) != MarketStatus::MATURE {
@@ -511,6 +513,7 @@ impl MarketContract {
     }
 
     pub fn liquidate(env: Env) -> Result<bool, MarketError> {
+        // Anyone can and is even encouraged to call this function.
         if !has_administrator(&env) {
             return Err(MarketError::NotInitialized);
         }
@@ -645,17 +648,33 @@ impl MarketContract {
     fn _transfer_asset(
         env: &Env,
         asset_address: &Address,
-        from: &Address,
-        to: &Address,
+        from_vault: &Address,
+        to_vault: &Address,
     ) -> Result<(), MarketError> {
         //from.require_auth();
+        // Note: vaults need to enable full transfer allowance of the underlying asset between each other
         let token_client = token::Client::new(&env, &asset_address);
-        let allowance: i128 = token_client.allowance(&from, &to); // TODO: check allowance first
-        let balance: i128 = token_client.balance(&from);
+        let allowance: i128 = token_client.allowance(&from_vault, &to_vault);
+        let balance: i128 = token_client.balance(&from_vault);
         if balance > allowance {
             return Err(MarketError::InsufficientAllowance);
         }
-        token_client.transfer(&from, &to, &balance);
+        let fee_percentage: u32 = read_commission_fee(&env);
+        if fee_percentage > 0 {
+            // (fee amount) = (balance of assets) * (fee percentage) / 100.
+            let fee_amount: i128 = (balance.checked_mul(fee_percentage.into()).unwrap())
+                .checked_div(100_i128)
+                .unwrap();
+            let new_balance: i128 = balance - fee_amount;
+            let admin: Address = read_administrator(&env);
+            // Transfer asset amount minus fee amount from one vault to another
+            token_client.transfer(&from_vault, &to_vault, &new_balance);
+            // Transfer fee amount to market administrator
+            token_client.transfer_from(&to_vault, &from_vault, &admin, &fee_amount);
+        } else {
+            // Transfer whole asset amount from one vault to another
+            token_client.transfer(&from_vault, &to_vault, &balance);
+        }
         Ok(())
     }
 
