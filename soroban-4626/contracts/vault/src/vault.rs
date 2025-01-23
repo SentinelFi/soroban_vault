@@ -30,10 +30,12 @@ use crate::{
     ivault::IPublicVault,
     math::{mul_div, safe_add_i128, safe_add_u32, safe_mul, safe_pow, safe_sub_i128, Rounding},
     storage::{
-        has_administrator, is_paused, read_administrator, read_asset_address, read_asset_decimals,
-        read_asset_name, read_asset_symbol, read_total_shares, read_total_shares_of, remove_paused,
-        write_administrator, write_asset_address, write_asset_decimals, write_asset_name,
-        write_asset_symbol, write_paused, write_total_shares, write_total_shares_of,
+        deposit_paused, has_administrator, is_paused, read_administrator, read_asset_address,
+        read_asset_decimals, read_asset_name, read_asset_symbol, read_total_shares,
+        read_total_shares_of, remove_deposit_paused, remove_paused, remove_withdraw_paused,
+        withdraw_paused, write_administrator, write_asset_address, write_asset_decimals,
+        write_asset_name, write_asset_symbol, write_deposit_paused, write_paused,
+        write_total_shares, write_total_shares_of, write_withdraw_paused,
     },
 };
 
@@ -414,9 +416,79 @@ impl IPublicVault for Vault {
             admin.require_auth();
             if is_paused(&env) {
                 remove_paused(&env);
+                remove_deposit_paused(&env);
+                remove_withdraw_paused(&env);
                 Ok(true)
             } else {
                 Err(ContractError::ContractIsAlreadyNotPaused)
+            }
+        } else {
+            Err(ContractError::NotInitialized)
+        }
+    }
+
+    fn pause_deposit(env: Env) -> Result<bool, ContractError> {
+        if has_administrator(&env) {
+            let admin: Address = read_administrator(&env);
+            admin.require_auth();
+            if is_paused(&env) {
+                Err(ContractError::ContractIsAlreadyPaused)
+            } else if deposit_paused(&env) {
+                Err(ContractError::DepositIsAlreadyPaused)
+            } else {
+                write_deposit_paused(&env);
+                Ok(true)
+            }
+        } else {
+            Err(ContractError::NotInitialized)
+        }
+    }
+
+    fn pause_withdrawal(env: Env) -> Result<bool, ContractError> {
+        if has_administrator(&env) {
+            let admin: Address = read_administrator(&env);
+            admin.require_auth();
+            if is_paused(&env) {
+                Err(ContractError::ContractIsAlreadyPaused)
+            } else if withdraw_paused(&env) {
+                Err(ContractError::WithdrawIsAlreadyPaused)
+            } else {
+                write_withdraw_paused(&env);
+                Ok(true)
+            }
+        } else {
+            Err(ContractError::NotInitialized)
+        }
+    }
+
+    fn unpause_deposit(env: Env) -> Result<bool, ContractError> {
+        if has_administrator(&env) {
+            let admin: Address = read_administrator(&env);
+            admin.require_auth();
+            if is_paused(&env) && deposit_paused(&env) {
+                write_withdraw_paused(&env);
+                remove_deposit_paused(&env);
+                remove_paused(&env);
+                Ok(true)
+            } else {
+                Err(ContractError::DepositIsAlreadyNotPaused)
+            }
+        } else {
+            Err(ContractError::NotInitialized)
+        }
+    }
+
+    fn unpause_withdrawal(env: Env) -> Result<bool, ContractError> {
+        if has_administrator(&env) {
+            let admin: Address = read_administrator(&env);
+            admin.require_auth();
+            if is_paused(&env) && withdraw_paused(&env) {
+                write_deposit_paused(&env);
+                remove_withdraw_paused(&env);
+                remove_paused(&env);
+                Ok(true)
+            } else {
+                Err(ContractError::DepositIsAlreadyNotPaused)
             }
         } else {
             Err(ContractError::NotInitialized)
@@ -520,9 +592,21 @@ impl Vault {
         write_total_shares_of(&_env, _owner.clone(), &safe_sub_i128(owner_shares, _shares));
     }
 
-    fn _ensure_not_paused(_env: &Env) {
+    fn _ensure_contract_not_paused(_env: &Env) {
         if is_paused(_env) {
             panic!("Contract is currently paused!");
+        }
+    }
+
+    fn _ensure_deposit_not_paused(_env: &Env) {
+        if deposit_paused(_env) {
+            panic!("Deposit is currently paused!");
+        }
+    }
+
+    fn _ensure_withdraw_not_paused(_env: &Env) {
+        if withdraw_paused(_env) {
+            panic!("Withdraw is currently paused!");
         }
     }
 
@@ -534,7 +618,8 @@ impl Vault {
         _shares: i128,
     ) -> () {
         // Assume that here we receive already valid parameters, i.e. caller is authorized, amounts are validated and so on
-        Self::_ensure_not_paused(_env);
+        Self::_ensure_contract_not_paused(_env);
+        Self::_ensure_deposit_not_paused(_env);
         // Transfer underlying assets from caller to vault
         // This must happen before minting shares to prevent reentrancy issues
         let result: i128 = Self::_multiply_by_decimals(&_env, _assets);
@@ -556,7 +641,8 @@ impl Vault {
         _shares: i128,
     ) -> () {
         // Assume that here we receive already valid parameters, i.e. caller is authorized, amounts are validated and so on
-        Self::_ensure_not_paused(_env);
+        Self::_ensure_contract_not_paused(_env);
+        Self::_ensure_withdraw_not_paused(_env);
         // Spend allowance
         if _caller != _owner {
             _spend_allowance(&_env, &_owner, &_caller, _shares).unwrap();

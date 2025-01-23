@@ -65,4 +65,8 @@ pub trait IPublicVault {
     fn is_paused(env: Env) -> bool;
     fn pause(env: Env) -> Result<bool, ContractError>;
     fn unpause(env: Env) -> Result<bool, ContractError>;
+    fn pause_deposit(env: Env) -> Result<bool, ContractError>;
+    fn pause_withdrawal(env: Env) -> Result<bool, ContractError>;
+    fn unpause_withdrawal(env: Env) -> Result<bool, ContractError>;
+    fn unpause_deposit(env: Env) -> Result<bool, ContractError>;
 }

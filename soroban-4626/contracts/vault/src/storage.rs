@@ -117,6 +117,36 @@ pub fn remove_paused(e: &Env) {
     e.storage().instance().remove(&key);
 }
 
+pub fn deposit_paused(e: &Env) -> bool {
+    let key = DataKey::DepositPaused;
+    e.storage().instance().has(&key)
+}
+
+pub fn write_deposit_paused(e: &Env) {
+    let key = DataKey::DepositPaused;
+    e.storage().instance().set(&key, &())
+}
+
+pub fn remove_deposit_paused(e: &Env) {
+    let key = DataKey::DepositPaused;
+    e.storage().instance().remove(&key);
+}
+
+pub fn withdraw_paused(e: &Env) -> bool {
+    let key = DataKey::WithdrawPaused;
+    e.storage().instance().has(&key)
+}
+
+pub fn write_withdraw_paused(e: &Env) {
+    let key = DataKey::WithdrawPaused;
+    e.storage().instance().set(&key, &())
+}
+
+pub fn remove_withdraw_paused(e: &Env) {
+    let key = DataKey::WithdrawPaused;
+    e.storage().instance().remove(&key);
+}
+
 /*
   State archival is a special mechanism defined by the Stellar protocol that ensures
   that the active ledger state size doesn't grow indefinitely.

@@ -12,4 +12,6 @@ pub enum DataKey {
     TotalSharesOf(Address),      // (hodler)
     Allowance(Address, Address), // (owner, spender)
     IsPaused,
+    DepositPaused,
+    WithdrawPaused,
 }

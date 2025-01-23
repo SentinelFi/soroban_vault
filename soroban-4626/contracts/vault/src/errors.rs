@@ -27,5 +27,9 @@ pub enum ContractError {
     AlreadyInitialized = 2,
     ContractIsAlreadyPaused = 3,
     ContractIsAlreadyNotPaused = 4,
-    ArithmeticError = 5,
+    DepositIsAlreadyPaused = 5,
+    DepositIsAlreadyNotPaused = 6,
+    WithdrawIsAlreadyPaused = 7,
+    WithdrawIsAlreadyNotPaused = 8,
+    ArithmeticError = 9,
 }
