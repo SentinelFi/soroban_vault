@@ -129,7 +129,7 @@ impl MarketContract {
         _ = hedge_vault
             .try_initialize(
                 &data.admin_address,
-                &data.hedge_vault_address,
+                &data.asset_address,
                 &lock_timestamp,
                 &unlock_timestamp,
             )
@@ -138,30 +138,33 @@ impl MarketContract {
         _ = risk_vault
             .try_initialize(
                 &data.admin_address,
-                &data.risk_vault_address,
+                &data.asset_address,
                 &lock_timestamp,
                 &unlock_timestamp,
             )
             .map_err(|_| MarketError::RiskVaultInitializationFailed)?;
 
         // Approve asset allowance between hedge and risk vaults
+        // The maximum TTL (Time To Live) for token allowance approval is capped at some ledgers.
+        // For now hard-coded 17280, which is equivalent to approximately 1 day.
+        // live_until must be >= ledger sequence
         _ = hedge_vault
             .try_approve_asset_allowance(
                 &data.asset_address,
                 &data.risk_vault_address,
                 &i128::MAX,
-                &u32::MAX,
+                &(env.ledger().sequence() + 17280),
             )
-            .map_err(|_| MarketError::HedgeVaultInitializationFailed)?;
+            .map_err(|_| MarketError::HedgeVaultAllowanceFailed)?;
 
         _ = risk_vault
             .try_approve_asset_allowance(
                 &data.asset_address,
                 &data.hedge_vault_address,
                 &i128::MAX,
-                &u32::MAX,
+                &(env.ledger().sequence() + 17280),
             )
-            .map_err(|_| MarketError::RiskVaultInitializationFailed)?;
+            .map_err(|_| MarketError::RiskVaultAllowanceFailed)?;
 
         // Persist State
         write_administrator(&env, &data.admin_address);

@@ -2,23 +2,21 @@ use soroban_sdk::contracttype;
 
 #[contracttype]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
 pub enum MarketStatus {
-    LIVE = 1,
-    MATURE = 2,
-    MATURED = 3,
-    LIQUIDATE = 4,
-    LIQUIDATED = 5,
+    LIVE = 0,
+    MATURE = 1,
+    MATURED = 2,
+    LIQUIDATE = 3,
+    LIQUIDATED = 4,
 }
 
 #[contracttype]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
 pub enum MarketRisk {
-    LOW = 1,
-    MEDIUM = 2,
-    HIGH = 3,
-    UNKNOWN = 4,
+    LOW = 0,
+    MEDIUM = 1,
+    HIGH = 2,
+    UNKNOWN = 3,
 }
 
 #[derive(Clone)]
