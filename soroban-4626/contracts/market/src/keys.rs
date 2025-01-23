@@ -5,11 +5,10 @@ use soroban_sdk::contracttype;
 #[repr(u32)]
 pub enum MarketStatus {
     LIVE = 1,
-    LOCKED = 2,
-    MATURE = 3,
-    MATURED = 4,
-    LIQUIDATE = 5,
-    LIQUIDATED = 6,
+    MATURE = 2,
+    MATURED = 3,
+    LIQUIDATE = 4,
+    LIQUIDATED = 5,
 }
 
 #[contracttype]

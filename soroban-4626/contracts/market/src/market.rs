@@ -434,6 +434,7 @@ impl MarketContract {
         // If event didn't occurr and event time < (expected event time + some threshold), then ignore.
         // If event occurred and no event time sent, then return an error.
         // If event didn't occurr and no event time sent, then ignore.
+        // Note that oracles can only set the status to 'can liquidate' or 'can mature'. The actual liquidation or maturity action is done by keepers.
         if !has_administrator(&env) {
             return Err(MarketError::NotInitialized);
         }
@@ -583,19 +584,22 @@ impl MarketContract {
         Ok(())
     }
 
+    /*
+    NOTE: This function is NOT needed with the new lock mechanism.
     fn _ensure_not_liquidated_or_matured_or_locked(env: &Env) -> Result<(), MarketError> {
-        let status: MarketStatus = read_status(&env);
-        if status == MarketStatus::LIQUIDATED || status == MarketStatus::LIQUIDATE {
-            return Err(MarketError::AlreadyLiquidated);
-        }
-        if status == MarketStatus::MATURED || status == MarketStatus::MATURE {
-            return Err(MarketError::AlreadyMatured);
-        }
-        if status == MarketStatus::LOCKED {
-            return Err(MarketError::AlreadyLocked);
-        }
-        Ok(())
+    let status: MarketStatus = read_status(&env);
+    if status == MarketStatus::LIQUIDATED || status == MarketStatus::LIQUIDATE {
+        return Err(MarketError::AlreadyLiquidated);
     }
+    if status == MarketStatus::MATURED || status == MarketStatus::MATURE {
+        return Err(MarketError::AlreadyMatured);
+    }
+    if status == MarketStatus::LOCKED {
+        return Err(MarketError::AlreadyLocked);
+    }
+    Ok(())
+    }
+    */
 
     fn _approve_transfers(
         env: Env,
