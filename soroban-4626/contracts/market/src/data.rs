@@ -18,4 +18,5 @@ pub struct MarketData {
     pub event_unix_timestamp: u64,
     pub lock_period_in_seconds: u64,
     pub event_threshold_in_seconds: u64,
+    pub unlock_period_in_seconds: u64,
 }

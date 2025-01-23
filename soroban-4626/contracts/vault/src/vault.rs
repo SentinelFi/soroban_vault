@@ -31,11 +31,12 @@ use crate::{
     math::{mul_div, safe_add_i128, safe_add_u32, safe_mul, safe_pow, safe_sub_i128, Rounding},
     storage::{
         deposit_paused, has_administrator, is_paused, read_administrator, read_asset_address,
-        read_asset_decimals, read_asset_name, read_asset_symbol, read_total_shares,
-        read_total_shares_of, remove_deposit_paused, remove_paused, remove_withdraw_paused,
-        withdraw_paused, write_administrator, write_asset_address, write_asset_decimals,
-        write_asset_name, write_asset_symbol, write_deposit_paused, write_paused,
-        write_total_shares, write_total_shares_of, write_withdraw_paused,
+        read_asset_decimals, read_asset_name, read_asset_symbol, read_lock_timestamp,
+        read_total_shares, read_total_shares_of, read_unlock_timestamp, remove_deposit_paused,
+        remove_paused, remove_withdraw_paused, withdraw_paused, write_administrator,
+        write_asset_address, write_asset_decimals, write_asset_name, write_asset_symbol,
+        write_deposit_paused, write_lock_timestamp, write_paused, write_total_shares,
+        write_total_shares_of, write_unlock_timestamp, write_withdraw_paused,
     },
 };
 
@@ -55,12 +56,17 @@ impl IPublicVault for Vault {
         env: Env,
         admin: Address,
         asset_address: Address,
+        lock_timestamp: u64,
+        unlock_timestamp: u64,
     ) -> Result<(String, String, u32), ContractError> {
         admin.require_auth();
 
         if has_administrator(&env) {
             Err(ContractError::AlreadyInitialized)
         } else {
+            if lock_timestamp > unlock_timestamp {
+                return Err(ContractError::InvalidLockTimes);
+            }
             // Before passing asset_address, verify the underlying asset contract exists and implements the token trait, otherwise initialization will fail
             let token_client = token::Client::new(&env, &asset_address);
             let name: String = token_client.name();
@@ -72,8 +78,11 @@ impl IPublicVault for Vault {
             write_asset_name(&env, &name);
             write_asset_symbol(&env, &symbol);
             write_asset_decimals(&env, &decimals);
+
             write_total_shares(&env, &0i128);
             write_administrator(&env, &admin);
+            write_lock_timestamp(&env, &lock_timestamp);
+            write_unlock_timestamp(&env, &unlock_timestamp);
 
             Self::_emit_initialized_event(
                 &env,
@@ -162,6 +171,24 @@ impl IPublicVault for Vault {
         if has_administrator(&env) {
             let balance: i128 = read_total_shares_of(&env, address.clone());
             Ok(balance)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
+    }
+
+    fn lock_timestamp(env: Env) -> Result<u64, ContractError> {
+        if has_administrator(&env) {
+            let lock: u64 = read_lock_timestamp(&env);
+            Ok(lock)
+        } else {
+            Err(ContractError::NotInitialized)
+        }
+    }
+
+    fn unlock_timestamp(env: Env) -> Result<u64, ContractError> {
+        if has_administrator(&env) {
+            let unlock: u64 = read_unlock_timestamp(&env);
+            Ok(unlock)
         } else {
             Err(ContractError::NotInitialized)
         }
@@ -610,6 +637,15 @@ impl Vault {
         }
     }
 
+    fn _ensure_not_locked(_env: &Env) {
+        let current_timestamp: u64 = _env.ledger().timestamp();
+        let lock_timestamp: u64 = read_lock_timestamp(&_env);
+        let unlock_timestamp: u64 = read_unlock_timestamp(&_env);
+        if current_timestamp >= lock_timestamp && current_timestamp <= unlock_timestamp {
+            panic!("New deposits and withdrawals are currently locked!");
+        }
+    }
+
     fn _deposit(
         _env: &Env,
         _caller: &Address,
@@ -620,6 +656,7 @@ impl Vault {
         // Assume that here we receive already valid parameters, i.e. caller is authorized, amounts are validated and so on
         Self::_ensure_contract_not_paused(_env);
         Self::_ensure_deposit_not_paused(_env);
+        Self::_ensure_not_locked(_env);
         // Transfer underlying assets from caller to vault
         // This must happen before minting shares to prevent reentrancy issues
         let result: i128 = Self::_multiply_by_decimals(&_env, _assets);
@@ -643,6 +680,7 @@ impl Vault {
         // Assume that here we receive already valid parameters, i.e. caller is authorized, amounts are validated and so on
         Self::_ensure_contract_not_paused(_env);
         Self::_ensure_withdraw_not_paused(_env);
+        Self::_ensure_not_locked(_env);
         // Spend allowance
         if _caller != _owner {
             _spend_allowance(&_env, &_owner, &_caller, _shares).unwrap();

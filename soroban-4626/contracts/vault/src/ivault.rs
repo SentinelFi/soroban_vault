@@ -7,6 +7,8 @@ pub trait IPublicVault {
         env: Env,
         admin: Address,
         asset_address: Address,
+        lock_timestamp: u64,
+        unlock_timestamp: u64,
     ) -> Result<(String, String, u32), ContractError>;
     fn administrator_address(env: &Env) -> Result<Address, ContractError>;
     fn asset_decimals(env: &Env) -> Result<u32, ContractError>;
@@ -17,6 +19,8 @@ pub trait IPublicVault {
     fn total_assets(env: &Env) -> Result<i128, ContractError>;
     fn total_shares(env: &Env) -> Result<i128, ContractError>;
     fn balance_of_shares(env: &Env, address: Address) -> Result<i128, ContractError>;
+    fn lock_timestamp(env: Env) -> Result<u64, ContractError>;
+    fn unlock_timestamp(env: Env) -> Result<u64, ContractError>;
     fn convert_to_shares(env: &Env, assets: i128) -> Result<i128, ContractError>;
     fn convert_to_assets(env: &Env, shares: i128) -> Result<i128, ContractError>;
     fn max_deposit(_: &Env, _address: Address) -> i128;

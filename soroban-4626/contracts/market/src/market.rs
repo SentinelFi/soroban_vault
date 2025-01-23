@@ -37,12 +37,13 @@ use crate::{
         read_description, read_event_threshold_seconds, read_event_timestamp, read_hedge_vault,
         read_initialized_time, read_is_automatic, read_last_keeper_time, read_last_oracle_time,
         read_liquidated_time, read_lock_seconds, read_matured_time, read_name, read_oracle,
-        read_risk_score, read_risk_vault, read_status, remove_is_paused, write_administrator,
-        write_asset, write_commission_fee, write_description, write_event_threshold_seconds,
-        write_event_timestamp, write_hedge_vault, write_initialized_time, write_is_automatic,
-        write_is_paused, write_last_keeper_time, write_last_oracle_time, write_liquidated_time,
-        write_lock_seconds, write_matured_time, write_name, write_oracle, write_risk_score,
-        write_risk_vault, write_status,
+        read_risk_score, read_risk_vault, read_status, read_unlock_seconds, remove_is_paused,
+        write_administrator, write_asset, write_commission_fee, write_description,
+        write_event_threshold_seconds, write_event_timestamp, write_hedge_vault,
+        write_initialized_time, write_is_automatic, write_is_paused, write_last_keeper_time,
+        write_last_oracle_time, write_liquidated_time, write_lock_seconds, write_matured_time,
+        write_name, write_oracle, write_risk_score, write_risk_vault, write_status,
+        write_unlock_seconds,
     },
 };
 
@@ -60,6 +61,8 @@ const MIN_LOCK_IN_SECONDS: u64 = 0;
 const MAX_LOCK_IN_SECONDS: u64 = 604800; // 7 days
 const MIN_EVENT_THRESHOLD_IN_SECONDS: u64 = 0;
 const MAX_EVENT_THRESHOLD_IN_SECONDS: u64 = 86400; // 1 day
+const MIN_UNLOCK_IN_SECONDS: u64 = 0;
+const MAX_UNLOCK_IN_SECONDS: u64 = 604800; // 7 days
 
 #[allow(dead_code)]
 #[contractimpl]
@@ -81,8 +84,7 @@ impl MarketContract {
             return Err(MarketError::InvalidUnixTimestamp);
         }
 
-        if data.event_unix_timestamp < data.lock_period_in_seconds
-            || data.lock_period_in_seconds < MIN_LOCK_IN_SECONDS
+        if data.lock_period_in_seconds < MIN_LOCK_IN_SECONDS
             || data.lock_period_in_seconds > MAX_LOCK_IN_SECONDS
         {
             return Err(MarketError::InvalidLockPeriod);
@@ -94,6 +96,12 @@ impl MarketContract {
             return Err(MarketError::InvalidEventThreshold);
         }
 
+        if data.unlock_period_in_seconds < MIN_UNLOCK_IN_SECONDS
+            || data.unlock_period_in_seconds > MAX_UNLOCK_IN_SECONDS
+        {
+            return Err(MarketError::InvalidUnlockPeriod);
+        }
+
         if data.hedge_vault_address == data.risk_vault_address {
             return Err(MarketError::HedgeAndRiskAddressesAreSame);
         }
@@ -102,14 +110,35 @@ impl MarketContract {
             return Err(MarketError::InvalidCommisionFee);
         }
 
+        let lock_timestamp: u64 = data
+            .event_unix_timestamp
+            .checked_sub(data.lock_period_in_seconds)
+            .unwrap();
+        let unlock_timestamp: u64 = data
+            .event_unix_timestamp
+            .checked_add(data.event_threshold_in_seconds)
+            .unwrap()
+            .checked_add(data.unlock_period_in_seconds)
+            .unwrap();
+
         // Create Vaults
         let hedge_vault = VaultContractClient::new(&env, &data.hedge_vault_address);
         let risk_vault = VaultContractClient::new(&env, &data.risk_vault_address);
         _ = hedge_vault
-            .try_initialize(&data.admin_address, &data.hedge_vault_address)
+            .try_initialize(
+                &data.admin_address,
+                &data.hedge_vault_address,
+                &lock_timestamp,
+                &unlock_timestamp,
+            )
             .map_err(|_| MarketError::HedgeVaultInitializationFailed)?;
         _ = risk_vault
-            .try_initialize(&data.admin_address, &data.risk_vault_address)
+            .try_initialize(
+                &data.admin_address,
+                &data.risk_vault_address,
+                &lock_timestamp,
+                &unlock_timestamp,
+            )
             .map_err(|_| MarketError::RiskVaultInitializationFailed)?;
 
         // Persist State
@@ -128,6 +157,7 @@ impl MarketContract {
         write_event_timestamp(&env, &data.event_unix_timestamp);
         write_lock_seconds(&env, &data.lock_period_in_seconds);
         write_event_threshold_seconds(&env, &data.event_threshold_in_seconds);
+        write_unlock_seconds(&env, &data.unlock_period_in_seconds);
 
         // Return Result
         Ok(true)
@@ -257,6 +287,38 @@ impl MarketContract {
         Ok(read_event_threshold_seconds(&env))
     }
 
+    pub fn unlock_period_in_seconds(env: Env) -> Result<u64, MarketError> {
+        if !has_administrator(&env) {
+            return Err(MarketError::NotInitialized);
+        }
+        Ok(read_unlock_seconds(&env))
+    }
+
+    pub fn time_of_lock(env: Env) -> Result<u64, MarketError> {
+        if !has_administrator(&env) {
+            return Err(MarketError::NotInitialized);
+        }
+        let lock: u64 = read_lock_seconds(&env);
+        let event: u64 = read_event_timestamp(&env);
+        let lock_timestamp: u64 = event.checked_sub(lock).unwrap();
+        Ok(lock_timestamp)
+    }
+
+    pub fn time_of_unlock(env: Env) -> Result<u64, MarketError> {
+        if !has_administrator(&env) {
+            return Err(MarketError::NotInitialized);
+        }
+        let unlock: u64 = read_unlock_seconds(&env);
+        let event: u64 = read_event_timestamp(&env);
+        let threshold: u64 = read_event_threshold_seconds(&env);
+        let unlock_timestamp: u64 = event
+            .checked_add(threshold)
+            .unwrap()
+            .checked_add(unlock)
+            .unwrap();
+        Ok(unlock_timestamp)
+    }
+
     pub fn risk_score(env: Env) -> Result<MarketRisk, MarketError> {
         if !has_administrator(&env) {
             return Err(MarketError::NotInitialized);
@@ -332,6 +394,8 @@ impl MarketContract {
         Ok(read_last_keeper_time(&env))
     }
 
+    /*
+    NOTE: This function is need needed as vaults can lock themselves, when admin feeds them with time stamps.
     pub fn lock(env: Env) -> Result<bool, MarketError> {
         // Keeper bots should call this function to lock the vaults if possible
         // Locks vaults to prevent new deposits and withdrawals
@@ -354,6 +418,7 @@ impl MarketContract {
         _ = Self::lock_vaults(&env)?;
         return Ok(true);
     }
+    */
 
     pub fn bump(
         env: Env,
@@ -588,8 +653,6 @@ impl MarketContract {
         let risk: Address = read_risk_vault(&env);
         let asset_address: Address = read_asset(&env);
         Self::_transfer_asset(&env, &asset_address, &hedge, &risk)?;
-        // Unlock withdrawal from one vault
-        Self::unlock_withdrawal(&env, &risk)?;
         // Emit event
         let name: String = read_name(&env);
         Self::_emit_matured_event(&env, &hedge, &risk, name, current_timestamp);
@@ -624,8 +687,6 @@ impl MarketContract {
         let risk: Address = read_risk_vault(&env);
         let asset_address: Address = read_asset(&env);
         Self::_transfer_asset(&env, &asset_address, &risk, &hedge)?;
-        // Unlock withdrawal from one vault
-        Self::unlock_withdrawal(&env, &hedge)?;
         // Emit event
         let name: String = read_name(&env);
         Self::_emit_liquidated_event(&env, &hedge, &risk, name, current_timestamp);
@@ -633,6 +694,7 @@ impl MarketContract {
     }
 
     fn lock_vaults(env: &Env) -> Result<bool, MarketError> {
+        // This will work if called only by admin
         let hedge: Address = read_hedge_vault(&env);
         let risk: Address = read_risk_vault(&env);
         let hedge_vault = VaultContractClient::new(&env, &hedge);
@@ -643,14 +705,6 @@ impl MarketContract {
         _ = risk_vault
             .try_pause()
             .map_err(|_| MarketError::VaultPauseFailed)?;
-        Ok(true)
-    }
-
-    fn unlock_withdrawal(env: &Env, vault: &Address) -> Result<bool, MarketError> {
-        let vault_client = VaultContractClient::new(&env, &vault);
-        _ = vault_client
-            .try_unpause_withdrawal()
-            .map_err(|_| MarketError::WithdrawalUnpauseFailed)?;
         Ok(true)
     }
 

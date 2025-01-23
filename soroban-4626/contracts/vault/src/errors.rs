@@ -31,5 +31,6 @@ pub enum ContractError {
     DepositIsAlreadyNotPaused = 6,
     WithdrawIsAlreadyPaused = 7,
     WithdrawIsAlreadyNotPaused = 8,
-    ArithmeticError = 9,
+    InvalidLockTimes = 9,
+    ArithmeticError = 10,
 }

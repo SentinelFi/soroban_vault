@@ -14,4 +14,6 @@ pub enum DataKey {
     IsPaused,
     DepositPaused,
     WithdrawPaused,
+    LockTimestamp,
+    UnlockTimestamp,
 }

@@ -29,4 +29,5 @@ pub enum MarketError {
     EventTimeIsRequired = 23,
     WithdrawalUnpauseFailed = 24,
     InvalidEventThreshold = 25,
+    InvalidUnlockPeriod = 26,
 }

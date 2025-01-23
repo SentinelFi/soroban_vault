@@ -45,4 +45,5 @@ pub enum MarketDataKey {
     LockInSeconds,
     IsPaused,
     EventThresholdInSeconds,
+    UnlockInSeconds,
 }

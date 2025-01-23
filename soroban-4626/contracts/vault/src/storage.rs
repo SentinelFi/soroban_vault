@@ -147,6 +147,26 @@ pub fn remove_withdraw_paused(e: &Env) {
     e.storage().instance().remove(&key);
 }
 
+pub fn read_lock_timestamp(e: &Env) -> u64 {
+    let key = DataKey::LockTimestamp;
+    e.storage().instance().get(&key).unwrap()
+}
+
+pub fn write_lock_timestamp(e: &Env, time: &u64) {
+    let key = DataKey::LockTimestamp;
+    e.storage().instance().set(&key, time);
+}
+
+pub fn read_unlock_timestamp(e: &Env) -> u64 {
+    let key = DataKey::UnlockTimestamp;
+    e.storage().instance().get(&key).unwrap()
+}
+
+pub fn write_unlock_timestamp(e: &Env, time: &u64) {
+    let key = DataKey::UnlockTimestamp;
+    e.storage().instance().set(&key, time);
+}
+
 /*
   State archival is a special mechanism defined by the Stellar protocol that ensures
   that the active ledger state size doesn't grow indefinitely.
