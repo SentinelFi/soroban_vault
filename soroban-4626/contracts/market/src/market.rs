@@ -557,8 +557,9 @@ impl MarketContract {
         let token_client = token::Client::new(&env, &read_asset(&env));
         let assets_hedge: i128 = token_client.balance(&hedge);
         let assets_risk: i128 = token_client.balance(&risk);
-        let admin_fee_hedge: i128 = Self::calculate_admin_fee_amount(&env, assets_hedge);
-        let admin_fee_risk: i128 = Self::calculate_admin_fee_amount(&env, assets_risk);
+        let fee_percentage: u32 = read_commission_fee(&env);
+        let admin_fee_hedge: i128 = Self::calculate_fee_amount(assets_hedge, fee_percentage);
+        let admin_fee_risk: i128 = Self::calculate_fee_amount(assets_risk, fee_percentage);
         // (total assets for distribution) = (hedge assets) + (risk assets) - (admin fee assets)
         let total_assets: i128 = assets_hedge
             .checked_add(assets_risk)
@@ -583,8 +584,9 @@ impl MarketContract {
         let token_client = token::Client::new(&env, &read_asset(&env));
         let assets_hedge: i128 = token_client.balance(&hedge);
         let assets_risk: i128 = token_client.balance(&risk);
-        let admin_fee_hedge: i128 = Self::calculate_admin_fee_amount(&env, assets_hedge);
-        let admin_fee_risk: i128 = Self::calculate_admin_fee_amount(&env, assets_risk);
+        let fee_percentage: u32 = read_commission_fee(&env);
+        let admin_fee_hedge: i128 = Self::calculate_fee_amount(assets_hedge, fee_percentage);
+        let admin_fee_risk: i128 = Self::calculate_fee_amount(assets_risk, fee_percentage);
         // (total assets for distribution) = (hedge assets) + (risk assets) - (admin fee assets)
         let total_assets: i128 = assets_hedge
             .checked_add(assets_risk)
