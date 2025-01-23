@@ -34,14 +34,15 @@ use crate::{
     storage::{
         has_administrator, has_last_keeper_time, has_last_oracle_time, has_liquidated_time,
         has_matured_time, is_paused, read_administrator, read_asset, read_commission_fee,
-        read_description, read_event_timestamp, read_hedge_vault, read_initialized_time,
-        read_is_automatic, read_last_keeper_time, read_last_oracle_time, read_liquidated_time,
-        read_lock_seconds, read_matured_time, read_name, read_oracle, read_risk_score,
-        read_risk_vault, read_status, remove_is_paused, write_administrator, write_asset,
-        write_commission_fee, write_description, write_event_timestamp, write_hedge_vault,
-        write_initialized_time, write_is_automatic, write_is_paused, write_last_keeper_time,
-        write_last_oracle_time, write_liquidated_time, write_lock_seconds, write_matured_time,
-        write_name, write_oracle, write_risk_score, write_risk_vault, write_status,
+        read_description, read_event_threshold_seconds, read_event_timestamp, read_hedge_vault,
+        read_initialized_time, read_is_automatic, read_last_keeper_time, read_last_oracle_time,
+        read_liquidated_time, read_lock_seconds, read_matured_time, read_name, read_oracle,
+        read_risk_score, read_risk_vault, read_status, remove_is_paused, write_administrator,
+        write_asset, write_commission_fee, write_description, write_event_threshold_seconds,
+        write_event_timestamp, write_hedge_vault, write_initialized_time, write_is_automatic,
+        write_is_paused, write_last_keeper_time, write_last_oracle_time, write_liquidated_time,
+        write_lock_seconds, write_matured_time, write_name, write_oracle, write_risk_score,
+        write_risk_vault, write_status,
     },
 };
 
@@ -57,7 +58,8 @@ const MIN_COMMISSION_FEE: u32 = 0;
 const MAX_COMMISSION_FEE: u32 = 100;
 const MIN_LOCK_IN_SECONDS: u64 = 0;
 const MAX_LOCK_IN_SECONDS: u64 = 604800; // 7 days
-const EVENT_THRESHOLD_IN_SECONDS: u64 = 18000; // 5 hours // TODO: configurable on init
+const MIN_EVENT_THRESHOLD_IN_SECONDS: u64 = 0;
+const MAX_EVENT_THRESHOLD_IN_SECONDS: u64 = 86400; // 1 day
 
 #[allow(dead_code)]
 #[contractimpl]
@@ -84,6 +86,12 @@ impl MarketContract {
             || data.lock_period_in_seconds > MAX_LOCK_IN_SECONDS
         {
             return Err(MarketError::InvalidLockPeriod);
+        }
+
+        if data.event_threshold_in_seconds < MIN_EVENT_THRESHOLD_IN_SECONDS
+            || data.event_threshold_in_seconds > MAX_EVENT_THRESHOLD_IN_SECONDS
+        {
+            return Err(MarketError::InvalidEventThreshold);
         }
 
         if data.hedge_vault_address == data.risk_vault_address {
@@ -119,6 +127,7 @@ impl MarketContract {
         write_is_automatic(&env, &data.is_automatic);
         write_event_timestamp(&env, &data.event_unix_timestamp);
         write_lock_seconds(&env, &data.lock_period_in_seconds);
+        write_event_threshold_seconds(&env, &data.event_threshold_in_seconds);
 
         // Return Result
         Ok(true)
@@ -239,6 +248,13 @@ impl MarketContract {
             return Ok(0);
         }
         Ok(current_timestamp - event_timestamp - lock_seconds)
+    }
+
+    pub fn event_threshold_in_seconds(env: Env) -> Result<u64, MarketError> {
+        if !has_administrator(&env) {
+            return Err(MarketError::NotInitialized);
+        }
+        Ok(read_event_threshold_seconds(&env))
     }
 
     pub fn risk_score(env: Env) -> Result<MarketRisk, MarketError> {
@@ -365,13 +381,14 @@ impl MarketContract {
         Self::_ensure_not_liquidated_or_matured(&env)?;
         // Check if liquidation or maturity should happen
         let expected_event_time: u64 = read_event_timestamp(&env);
+        let event_threshold: u64 = read_event_threshold_seconds(&env);
         if event_occurred {
             match event_time {
                 // Invalid bump data
                 None => return Err(MarketError::EventTimeIsRequired),
                 Some(e) => {
                     // Can be liquidated
-                    if e > expected_event_time + EVENT_THRESHOLD_IN_SECONDS {
+                    if e > expected_event_time.checked_add(event_threshold).unwrap() {
                         write_liquidated_time(&env, &current_timestamp); // Also persist actual event time?
                         write_status(&env, &MarketStatus::LIQUIDATE);
                         return Ok(true);
@@ -389,7 +406,7 @@ impl MarketContract {
                 None => return Ok(true),
                 Some(e) => {
                     // Can be matured
-                    if e >= expected_event_time + EVENT_THRESHOLD_IN_SECONDS {
+                    if e >= expected_event_time.checked_add(event_threshold).unwrap() {
                         write_matured_time(&env, &current_timestamp); // Also persist actual event time?
                         write_status(&env, &MarketStatus::MATURE);
                         return Ok(true);

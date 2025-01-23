@@ -209,6 +209,16 @@ pub fn write_lock_seconds(e: &Env, lock: &u64) {
     e.storage().instance().set(&key, lock);
 }
 
+pub fn read_event_threshold_seconds(e: &Env) -> u64 {
+    let key = MarketDataKey::EventThresholdInSeconds;
+    e.storage().instance().get(&key).unwrap()
+}
+
+pub fn write_event_threshold_seconds(e: &Env, threshold: &u64) {
+    let key = MarketDataKey::EventThresholdInSeconds;
+    e.storage().instance().set(&key, threshold);
+}
+
 pub fn is_paused(e: &Env) -> bool {
     let key = MarketDataKey::IsPaused;
     e.storage().instance().has(&key)
