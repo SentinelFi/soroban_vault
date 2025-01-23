@@ -53,7 +53,7 @@ pub trait IPublicVault {
         receiver: Address,
         owner: Address,
     ) -> Result<i128, VaultError>;
-    fn approve(
+    fn approve_shares(
         env: Env,
         owner: Address,
         spender: Address,
@@ -66,6 +66,13 @@ pub trait IPublicVault {
         receiver: Address,
         shares_amount: i128,
     ) -> Result<bool, VaultError>;
+    fn approve_asset_allowance(
+        env: Env,
+        asset_address: Address,
+        spender: Address,
+        approve_amount: i128,
+        expiration_ledger: u32,
+    ) -> Result<(), VaultError>;
     fn is_paused(env: Env) -> bool;
     fn pause(env: Env) -> Result<bool, ContractError>;
     fn unpause(env: Env) -> Result<bool, ContractError>;

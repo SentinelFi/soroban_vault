@@ -125,6 +125,7 @@ impl MarketContract {
         // Create Vaults
         let hedge_vault = VaultContractClient::new(&env, &data.hedge_vault_address);
         let risk_vault = VaultContractClient::new(&env, &data.risk_vault_address);
+
         _ = hedge_vault
             .try_initialize(
                 &data.admin_address,
@@ -133,12 +134,32 @@ impl MarketContract {
                 &unlock_timestamp,
             )
             .map_err(|_| MarketError::HedgeVaultInitializationFailed)?;
+
         _ = risk_vault
             .try_initialize(
                 &data.admin_address,
                 &data.risk_vault_address,
                 &lock_timestamp,
                 &unlock_timestamp,
+            )
+            .map_err(|_| MarketError::RiskVaultInitializationFailed)?;
+
+        // Approve asset allowance between hedge and risk vaults
+        _ = hedge_vault
+            .try_approve_asset_allowance(
+                &data.asset_address,
+                &data.risk_vault_address,
+                &i128::MAX,
+                &u32::MAX,
+            )
+            .map_err(|_| MarketError::HedgeVaultInitializationFailed)?;
+
+        _ = risk_vault
+            .try_approve_asset_allowance(
+                &data.asset_address,
+                &data.hedge_vault_address,
+                &i128::MAX,
+                &u32::MAX,
             )
             .map_err(|_| MarketError::RiskVaultInitializationFailed)?;
 

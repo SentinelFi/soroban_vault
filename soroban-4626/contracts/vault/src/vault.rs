@@ -361,7 +361,7 @@ impl IPublicVault for Vault {
         }
     }
 
-    fn approve(
+    fn approve_shares(
         env: Env,
         owner: Address,
         spender: Address,
@@ -412,6 +412,36 @@ impl IPublicVault for Vault {
                     Self::_emit_transfer_shares_event(&env, &owner, &receiver, shares_amount);
                     Ok(true)
                 }
+            }
+        } else {
+            Err(VaultError::AdministratorError)
+        }
+    }
+
+    fn approve_asset_allowance(
+        env: Env,
+        asset_address: Address,
+        spender: Address,
+        approve_amount: i128,
+        expiration_ledger: u32,
+    ) -> Result<(), VaultError> {
+        // Contracts can approve token allowances without explicit require_auth() when they are acting on their own behalf.
+        // The contract's address itself implies authorization.
+        // However, admin or similar access control is still needed to prevent unauthorized approvals.
+        if has_administrator(&env) {
+            let admin: Address = read_administrator(&env);
+            admin.require_auth();
+            if approve_amount <= 0 {
+                Err(VaultError::InvalidAmount)
+            } else {
+                let token_client = token::Client::new(&env, &asset_address);
+                token_client.approve(
+                    &env.current_contract_address(),
+                    &spender,
+                    &approve_amount,
+                    &expiration_ledger,
+                );
+                Ok(())
             }
         } else {
             Err(VaultError::AdministratorError)
@@ -642,7 +672,7 @@ impl Vault {
         let lock_timestamp: u64 = read_lock_timestamp(&_env);
         let unlock_timestamp: u64 = read_unlock_timestamp(&_env);
         if current_timestamp >= lock_timestamp && current_timestamp <= unlock_timestamp {
-            panic!("New deposits and withdrawals are currently locked!");
+            panic!("New deposits and withdrawals are not possible as vault is currently locked!");
         }
     }
 
