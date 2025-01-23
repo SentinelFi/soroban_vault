@@ -165,31 +165,23 @@ impl MarketContract {
     }
 
     pub fn status(env: Env) -> Result<MarketStatus, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_status(&env))
     }
 
     pub fn name(env: Env) -> Result<String, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_name(&env))
     }
 
     pub fn description(env: Env) -> Result<String, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_description(&env))
     }
 
     pub fn admin_address(env: Env) -> Result<Address, MarketError> {
-        if has_administrator(&env) {
-            return Ok(read_administrator(&env));
-        }
-        Err(MarketError::NotInitialized)
+        Self::check_is_initialized(&env)?;
+        Ok(read_administrator(&env))
     }
 
     pub fn current_contract_address(env: Env) -> Address {
@@ -197,38 +189,28 @@ impl MarketContract {
     }
 
     pub fn underlying_asset_address(env: Env) -> Result<Address, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_asset(&env))
     }
 
     pub fn hedge_address(env: Env) -> Result<Address, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_hedge_vault(&env))
     }
 
     pub fn risk_address(env: Env) -> Result<Address, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_risk_vault(&env))
     }
 
     pub fn oracle_address(env: Env) -> Result<Address, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_oracle(&env))
     }
 
     pub fn change_oracle_address(env: Env, oracle: Address) -> Result<bool, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
-        Self::_ensure_not_paused(&env)?;
+        Self::check_is_initialized(&env)?;
+        Self::ensure_not_paused(&env)?;
         let admin: Address = read_administrator(&env);
         admin.require_auth();
         write_oracle(&env, &oracle);
@@ -236,23 +218,17 @@ impl MarketContract {
     }
 
     pub fn initialized_time(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_initialized_time(&env))
     }
 
     pub fn expected_time_of_event(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_event_timestamp(&env))
     }
 
     pub fn actual_time_of_event(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         if !has_actual_event_timestamp(&env) {
             return Err(MarketError::ActualEventTimeNotSet);
         }
@@ -260,9 +236,7 @@ impl MarketContract {
     }
 
     pub fn time_until_event(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         let current_timestamp: u64 = env.ledger().timestamp();
         let event_timestamp: u64 = read_event_timestamp(&env);
         if event_timestamp <= current_timestamp {
@@ -272,16 +246,12 @@ impl MarketContract {
     }
 
     pub fn lock_period_in_seconds(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_lock_seconds(&env))
     }
 
     pub fn time_until_lock(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         let current_timestamp: u64 = env.ledger().timestamp();
         let event_timestamp: u64 = read_event_timestamp(&env);
         let lock_seconds: u64 = read_lock_seconds(&env);
@@ -292,23 +262,17 @@ impl MarketContract {
     }
 
     pub fn event_threshold_in_seconds(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_event_threshold_seconds(&env))
     }
 
     pub fn unlock_period_in_seconds(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_unlock_seconds(&env))
     }
 
     pub fn time_of_lock(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         let lock: u64 = read_lock_seconds(&env);
         let event: u64 = read_event_timestamp(&env);
         let lock_timestamp: u64 = event.checked_sub(lock).unwrap();
@@ -316,9 +280,7 @@ impl MarketContract {
     }
 
     pub fn time_of_unlock(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         let unlock: u64 = read_unlock_seconds(&env);
         let event: u64 = read_event_timestamp(&env);
         let threshold: u64 = read_event_threshold_seconds(&env);
@@ -331,17 +293,13 @@ impl MarketContract {
     }
 
     pub fn risk_score(env: Env) -> Result<MarketRisk, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_risk_score(&env))
     }
 
     pub fn change_risk_score(env: Env, risk: MarketRisk) -> Result<bool, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
-        Self::_ensure_not_paused(&env)?;
+        Self::check_is_initialized(&env)?;
+        Self::ensure_not_paused(&env)?;
         let admin: Address = read_administrator(&env);
         admin.require_auth();
         write_risk_score(&env, &risk);
@@ -349,9 +307,7 @@ impl MarketContract {
     }
 
     pub fn exercising(env: Env) -> Result<Symbol, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         match read_is_automatic(&env) {
             true => Ok(symbol_short!("Automatic")),
             false => Ok(symbol_short!("Manual")),
@@ -359,16 +315,12 @@ impl MarketContract {
     }
 
     pub fn commission(env: Env) -> Result<u32, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         Ok(read_commission_fee(&env))
     }
 
     pub fn liquidated_time(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         if !has_liquidated_time(&env) {
             return Err(MarketError::NotLiquidate);
         }
@@ -376,9 +328,7 @@ impl MarketContract {
     }
 
     pub fn matured_time(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         if !has_matured_time(&env) {
             return Err(MarketError::NotMature);
         }
@@ -386,9 +336,7 @@ impl MarketContract {
     }
 
     pub fn last_oracle_time(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         if !has_last_oracle_time(&env) {
             return Err(MarketError::LastOracleTimeNotSet);
         }
@@ -396,9 +344,7 @@ impl MarketContract {
     }
 
     pub fn last_keeper_time(env: Env) -> Result<u64, MarketError> {
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         if !has_last_keeper_time(&env) {
             return Err(MarketError::LastKeeperTimeNotSet);
         }
@@ -446,16 +392,14 @@ impl MarketContract {
         // If event occurred and no event time sent, then return an error.
         // If event didn't occurr and no event time sent, then ignore.
         // Note that oracles can only set the status to 'can liquidate' or 'can mature'. The actual liquidation or maturity action is done by keepers.
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         let current_timestamp: u64 = env.ledger().timestamp();
         write_last_oracle_time(&env, &current_timestamp);
         let oracle: Address = read_oracle(&env);
         oracle.require_auth();
-        Self::_ensure_not_paused(&env)?;
+        Self::ensure_not_paused(&env)?;
         // Check if already matured or liquidated
-        Self::_ensure_not_liquidated_or_matured(&env)?;
+        Self::ensure_not_liquidated_or_matured(&env)?;
         // Check if liquidation or maturity should happen
         let expected_event_time: u64 = read_event_timestamp(&env);
         let event_threshold: u64 = read_event_threshold_seconds(&env);
@@ -501,12 +445,10 @@ impl MarketContract {
 
     pub fn mature(env: Env) -> Result<bool, MarketError> {
         // Anyone can and is even encouraged to call this function.
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         let current_timestamp: u64 = env.ledger().timestamp();
         write_last_keeper_time(&env, &current_timestamp);
-        Self::_ensure_not_paused(&env)?;
+        Self::ensure_not_paused(&env)?;
         // Check if can be matured or liquidated. This also checks if it already matured or liquidated
         if read_status(&env) != MarketStatus::MATURE {
             return Err(MarketError::NotMature);
@@ -519,21 +461,19 @@ impl MarketContract {
         let hedge: Address = read_hedge_vault(&env);
         let risk: Address = read_risk_vault(&env);
         let asset_address: Address = read_asset(&env);
-        Self::_transfer_asset(&env, &asset_address, &hedge, &risk)?;
+        Self::transfer_asset(&env, &asset_address, &hedge, &risk)?;
         // Emit event
         let name: String = read_name(&env);
-        Self::_emit_matured_event(&env, &hedge, &risk, name, current_timestamp);
+        Self::emit_matured_event(&env, &hedge, &risk, name, current_timestamp);
         Ok(true)
     }
 
     pub fn liquidate(env: Env) -> Result<bool, MarketError> {
         // Anyone can and is even encouraged to call this function.
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         let current_timestamp: u64 = env.ledger().timestamp();
         write_last_keeper_time(&env, &current_timestamp);
-        Self::_ensure_not_paused(&env)?;
+        Self::ensure_not_paused(&env)?;
         // Check if can be matured or liquidated. This also checks if it already matured or liquidated
         if read_status(&env) != MarketStatus::LIQUIDATE {
             return Err(MarketError::NotLiquidate);
@@ -546,10 +486,10 @@ impl MarketContract {
         let hedge: Address = read_hedge_vault(&env);
         let risk: Address = read_risk_vault(&env);
         let asset_address: Address = read_asset(&env);
-        Self::_transfer_asset(&env, &asset_address, &risk, &hedge)?;
+        Self::transfer_asset(&env, &asset_address, &risk, &hedge)?;
         // Emit event
         let name: String = read_name(&env);
-        Self::_emit_liquidated_event(&env, &hedge, &risk, name, current_timestamp);
+        Self::emit_liquidated_event(&env, &hedge, &risk, name, current_timestamp);
         Ok(true)
     }
 
@@ -559,7 +499,8 @@ impl MarketContract {
     }
 
     pub fn calculate_apy(env: Env) -> Result<i128, MarketError> {
-        Self::_ensure_not_paused(&env)?;
+        Self::check_is_initialized(&env)?;
+        Self::ensure_not_paused(&env)?;
         // TODO: calculate based on vaults shares/assets ratio, return for view
         Ok(0)
     }
@@ -570,9 +511,7 @@ impl MarketContract {
 
     pub fn pause_market(env: Env) -> Result<bool, MarketError> {
         // Pause this contract and underlying vaults
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         let admin: Address = read_administrator(&env);
         admin.require_auth();
         if is_paused(&env) {
@@ -586,9 +525,7 @@ impl MarketContract {
 
     pub fn unpause_market(env: Env) -> Result<bool, MarketError> {
         // Unpause this contract and underlying vaults
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
+        Self::check_is_initialized(&env)?;
         let admin: Address = read_administrator(&env);
         admin.require_auth();
         if is_paused(&env) {
@@ -610,14 +547,21 @@ impl MarketContract {
 
     // Private functions
 
-    fn _ensure_not_paused(_env: &Env) -> Result<(), MarketError> {
-        match is_paused(_env) {
+    fn check_is_initialized(env: &Env) -> Result<(), MarketError> {
+        if !has_administrator(&env) {
+            return Err(MarketError::NotInitialized);
+        }
+        Ok(())
+    }
+
+    fn ensure_not_paused(env: &Env) -> Result<(), MarketError> {
+        match is_paused(env) {
             true => Err(MarketError::ContractIsAlreadyPaused),
             false => Ok(()),
         }
     }
 
-    fn _ensure_not_liquidated_or_matured(env: &Env) -> Result<(), MarketError> {
+    fn ensure_not_liquidated_or_matured(env: &Env) -> Result<(), MarketError> {
         let status: MarketStatus = read_status(&env);
         if status == MarketStatus::LIQUIDATED || status == MarketStatus::LIQUIDATE {
             return Err(MarketError::AlreadyLiquidated);
@@ -645,21 +589,21 @@ impl MarketContract {
     }
     */
 
-    fn _approve_transfers(
-        env: Env,
-        asset_address: Address,
-        from: Address,
-        expiration_ledger: u32,
-    ) -> Result<(), MarketError> {
-        //from.require_auth();
-        let token_client = token::Client::new(&env, &asset_address);
-        let contract_address: Address = env.current_contract_address();
-        let balance: i128 = token_client.balance(&from);
-        token_client.approve(&from, &contract_address, &balance, &expiration_ledger);
-        Ok(())
-    }
+    // fn approve_transfers(
+    //     env: Env,
+    //     asset_address: Address,
+    //     from: Address,
+    //     expiration_ledger: u32,
+    // ) -> Result<(), MarketError> {
+    //     //from.require_auth();
+    //     let token_client = token::Client::new(&env, &asset_address);
+    //     let contract_address: Address = env.current_contract_address();
+    //     let balance: i128 = token_client.balance(&from);
+    //     token_client.approve(&from, &contract_address, &balance, &expiration_ledger);
+    //     Ok(())
+    // }
 
-    fn _transfer_asset(
+    fn transfer_asset(
         env: &Env,
         asset_address: &Address,
         from_vault: &Address,
@@ -706,7 +650,7 @@ impl MarketContract {
         Ok(true)
     }
 
-    fn _emit_matured_event(
+    fn emit_matured_event(
         env: &Env,
         hedge: &Address,
         risk: &Address,
@@ -717,7 +661,7 @@ impl MarketContract {
         env.events().publish(topics, (name, timestamp));
     }
 
-    fn _emit_liquidated_event(
+    fn emit_liquidated_event(
         env: &Env,
         hedge: &Address,
         risk: &Address,
