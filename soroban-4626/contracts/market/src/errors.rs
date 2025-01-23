@@ -30,5 +30,6 @@ pub enum MarketError {
     InvalidEventThreshold = 24,
     InvalidUnlockPeriod = 25,
     InsufficientAllowance = 26,
-    ActualEventTimeNotSet = 27,
+    InsufficientAllowanceForFeeTransfer = 27,
+    ActualEventTimeNotSet = 28,
 }

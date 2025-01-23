@@ -23,6 +23,18 @@ pub trait IPublicVault {
     fn unlock_timestamp(env: Env) -> Result<u64, ContractError>;
     fn convert_to_shares(env: &Env, assets: i128) -> Result<i128, ContractError>;
     fn convert_to_assets(env: &Env, shares: i128) -> Result<i128, ContractError>;
+    fn convert_to_shares_simulate(
+        _env: &Env,
+        assets: i128,
+        total_assets: i128,
+        total_shares: i128,
+    ) -> Result<i128, ContractError>;
+    fn convert_to_assets_simulate(
+        _env: &Env,
+        shares: i128,
+        total_shares: i128,
+        total_assets: i128,
+    ) -> Result<i128, ContractError>;
     fn max_deposit(_: &Env, _address: Address) -> i128;
     fn max_mint(_: &Env, _address: Address) -> i128;
     fn max_withdraw(env: &Env, owner: Address) -> i128;

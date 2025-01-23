@@ -202,6 +202,24 @@ impl IPublicVault for Vault {
         Self::_convert_to_assets(env, shares, Rounding::Floor)
     }
 
+    fn convert_to_shares_simulate(
+        _env: &Env,
+        assets: i128,
+        total_assets: i128,
+        total_shares: i128,
+    ) -> Result<i128, ContractError> {
+        Self::_convert_to_shares_simulate(assets, total_assets, total_shares, Rounding::Floor)
+    }
+
+    fn convert_to_assets_simulate(
+        _env: &Env,
+        shares: i128,
+        total_shares: i128,
+        total_assets: i128,
+    ) -> Result<i128, ContractError> {
+        Self::_convert_to_assets_simulate(shares, total_shares, total_assets, Rounding::Floor)
+    }
+
     fn max_deposit(_: &Env, _address: Address) -> i128 {
         i128::MAX
     }
@@ -602,6 +620,26 @@ impl Vault {
         }
     }
 
+    // Called to calculate potential return of value
+    fn _convert_to_shares_simulate(
+        assets: i128,
+        total_assets: i128,
+        total_shares: i128,
+        rounding: Rounding,
+    ) -> Result<i128, ContractError> {
+        if assets <= 0 || total_assets <= assets || total_shares <= 0 {
+            Ok(0) // Assume it is fine to return zero here
+        } else {
+            let result: i128 = mul_div(
+                assets,
+                safe_add_i128(total_shares, safe_pow(10, Self::_decimals_offset())),
+                safe_add_i128(total_assets, 1),
+                rounding,
+            );
+            Ok(result)
+        }
+    }
+
     fn _convert_to_assets(
         env: &Env,
         shares: i128,
@@ -616,6 +654,26 @@ impl Vault {
                 shares,
                 safe_add_i128(tot_assets, 1),
                 safe_add_i128(tot_shares, safe_pow(10, Self::_decimals_offset())),
+                rounding,
+            );
+            Ok(result)
+        }
+    }
+
+    // Called to calculate potential return of value
+    fn _convert_to_assets_simulate(
+        shares: i128,
+        total_shares: i128,
+        total_assets: i128,
+        rounding: Rounding,
+    ) -> Result<i128, ContractError> {
+        if shares <= 0 || total_shares <= shares || total_assets <= 0 {
+            Ok(0) // Assume it is fine to return zero here
+        } else {
+            let result: i128 = mul_div(
+                shares,
+                safe_add_i128(total_assets, 1),
+                safe_add_i128(total_shares, safe_pow(10, Self::_decimals_offset())),
                 rounding,
             );
             Ok(result)

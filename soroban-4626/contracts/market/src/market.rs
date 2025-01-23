@@ -519,11 +519,85 @@ impl MarketContract {
         Err(MarketError::NotImplementedYet)
     }
 
-    pub fn calculate_apy(env: Env) -> Result<i128, MarketError> {
+    pub fn calculate_vault_assets_ratio(env: Env) -> Result<i128, MarketError> {
         Self::check_is_initialized(&env)?;
-        Self::ensure_not_paused(&env)?;
-        // TODO: calculate based on vaults shares/assets ratio, return for view
-        Ok(0)
+        let hedge_vault = VaultContractClient::new(&env, &read_hedge_vault(&env));
+        let risk_vault = VaultContractClient::new(&env, &read_risk_vault(&env));
+        let assets_hedge: i128 = hedge_vault.total_assets();
+        let assets_risk: i128 = risk_vault.total_assets();
+        if assets_hedge == 0 || assets_risk == 0 {
+            return Ok(0);
+        }
+        let ratio: i128 = assets_hedge.checked_div(assets_risk).unwrap();
+        Ok(ratio)
+    }
+
+    pub fn calculate_vault_shares_ratio(env: Env) -> Result<i128, MarketError> {
+        Self::check_is_initialized(&env)?;
+        let hedge_vault = VaultContractClient::new(&env, &read_hedge_vault(&env));
+        let risk_vault = VaultContractClient::new(&env, &read_risk_vault(&env));
+        let shares_hedge: i128 = hedge_vault.total_shares();
+        let shares_risk: i128 = risk_vault.total_shares();
+        if shares_hedge == 0 || shares_risk == 0 {
+            return Ok(0);
+        }
+        let ratio: i128 = shares_hedge.checked_div(shares_risk).unwrap();
+        Ok(ratio)
+    }
+
+    pub fn calculate_hedge_potential_return(
+        env: Env,
+        caller: Address,
+    ) -> Result<i128, MarketError> {
+        Self::check_is_initialized(&env)?;
+        caller.require_auth();
+        let hedge: Address = read_hedge_vault(&env);
+        let risk: Address = read_risk_vault(&env);
+        let vault = VaultContractClient::new(&env, &hedge);
+        let token_client = token::Client::new(&env, &read_asset(&env));
+        let assets_hedge: i128 = token_client.balance(&hedge);
+        let assets_risk: i128 = token_client.balance(&risk);
+        let admin_fee_hedge: i128 = Self::calculate_admin_fee_amount(&env, assets_hedge);
+        let admin_fee_risk: i128 = Self::calculate_admin_fee_amount(&env, assets_risk);
+        // (total assets for distribution) = (hedge assets) + (risk assets) - (admin fee assets)
+        let total_assets: i128 = assets_hedge
+            .checked_add(assets_risk)
+            .unwrap()
+            .checked_sub(admin_fee_hedge)
+            .unwrap()
+            .checked_sub(admin_fee_risk)
+            .unwrap();
+        let total_shares: i128 = vault.total_shares();
+        let caller_shares: i128 = vault.balance_of_shares(&caller);
+        let potential_return_value: i128 =
+            vault.convert_to_assets_simulate(&caller_shares, &total_shares, &total_assets);
+        Ok(potential_return_value)
+    }
+
+    pub fn calculate_risk_potential_return(env: Env, caller: Address) -> Result<i128, MarketError> {
+        Self::check_is_initialized(&env)?;
+        caller.require_auth();
+        let hedge: Address = read_hedge_vault(&env);
+        let risk: Address = read_risk_vault(&env);
+        let vault = VaultContractClient::new(&env, &risk);
+        let token_client = token::Client::new(&env, &read_asset(&env));
+        let assets_hedge: i128 = token_client.balance(&hedge);
+        let assets_risk: i128 = token_client.balance(&risk);
+        let admin_fee_hedge: i128 = Self::calculate_admin_fee_amount(&env, assets_hedge);
+        let admin_fee_risk: i128 = Self::calculate_admin_fee_amount(&env, assets_risk);
+        // (total assets for distribution) = (hedge assets) + (risk assets) - (admin fee assets)
+        let total_assets: i128 = assets_hedge
+            .checked_add(assets_risk)
+            .unwrap()
+            .checked_sub(admin_fee_hedge)
+            .unwrap()
+            .checked_sub(admin_fee_risk)
+            .unwrap();
+        let total_shares: i128 = vault.total_shares();
+        let caller_shares: i128 = vault.balance_of_shares(&caller);
+        let potential_return_value: i128 =
+            vault.convert_to_assets_simulate(&caller_shares, &total_shares, &total_assets);
+        Ok(potential_return_value)
     }
 
     pub fn is_market_paused(env: Env) -> bool {
@@ -610,19 +684,16 @@ impl MarketContract {
     }
     */
 
-    // fn approve_transfers(
-    //     env: Env,
-    //     asset_address: Address,
-    //     from: Address,
-    //     expiration_ledger: u32,
-    // ) -> Result<(), MarketError> {
-    //     //from.require_auth();
-    //     let token_client = token::Client::new(&env, &asset_address);
-    //     let contract_address: Address = env.current_contract_address();
-    //     let balance: i128 = token_client.balance(&from);
-    //     token_client.approve(&from, &contract_address, &balance, &expiration_ledger);
-    //     Ok(())
-    // }
+    fn calculate_fee_amount(whole_amount: i128, fee_percentage: u32) -> i128 {
+        if fee_percentage <= 0 {
+            return 0_i128;
+        }
+        // (fee amount) = (balance of assets) * (fee percentage) / 100.
+        let fee_amount: i128 = (whole_amount.checked_mul(fee_percentage.into()).unwrap())
+            .checked_div(100_i128)
+            .unwrap();
+        fee_amount
+    }
 
     fn transfer_asset(
         env: &Env,
@@ -632,26 +703,37 @@ impl MarketContract {
     ) -> Result<(), MarketError> {
         // Note: before calling this function, make sure that vaults have enabled full transfer allowance of the underlying asset between each other
         let token_client = token::Client::new(&env, &asset_address);
-        let allowance: i128 = token_client.allowance(&from_vault, &to_vault);
-        let balance: i128 = token_client.balance(&from_vault);
-        if balance > allowance {
+        let allowance_1: i128 = token_client.allowance(&from_vault, &to_vault);
+        let balance_1: i128 = token_client.balance(&from_vault);
+        if balance_1 > allowance_1 {
             return Err(MarketError::InsufficientAllowance);
         }
         let fee_percentage: u32 = read_commission_fee(&env);
         if fee_percentage > 0 {
-            // (fee amount) = (balance of assets) * (fee percentage) / 100.
-            let fee_amount: i128 = (balance.checked_mul(fee_percentage.into()).unwrap())
-                .checked_div(100_i128)
-                .unwrap();
-            let new_balance: i128 = balance - fee_amount;
+            let admin_fee_amount_1: i128 = Self::calculate_fee_amount(balance_1, fee_percentage);
+            let balance_2: i128 = token_client.balance(&to_vault);
+            let admin_fee_amount_2: i128 = Self::calculate_fee_amount(balance_2, fee_percentage);
+            let allowance_2: i128 = token_client.allowance(&to_vault, &from_vault);
+            if balance_2 > allowance_2 {
+                return Err(MarketError::InsufficientAllowanceForFeeTransfer);
+            }
             let admin: Address = read_administrator(&env);
-            // Transfer asset amount minus fee amount from one vault to another
-            token_client.transfer(&from_vault, &to_vault, &new_balance);
-            // Transfer fee amount to market administrator
-            token_client.transfer_from(&to_vault, &from_vault, &admin, &fee_amount);
+            // Make sure transfers happen after all the calculations are done
+            if balance_1 - admin_fee_amount_1 > 0 {
+                // Transfer asset amount minus fee amount from one vault to another
+                token_client.transfer(&from_vault, &to_vault, &(balance_1 - admin_fee_amount_1));
+            }
+            if admin_fee_amount_1 > 0 {
+                // Transfer fee amount to market administrator (vault must already have the allowance)
+                token_client.transfer_from(&to_vault, &from_vault, &admin, &admin_fee_amount_1);
+            }
+            if admin_fee_amount_2 > 0 {
+                // Another vault also needs to transfer fee amount to market administrator (vault must already have the allowance)
+                token_client.transfer_from(&from_vault, &to_vault, &admin, &admin_fee_amount_2);
+            }
         } else {
-            // Transfer whole asset amount from one vault to another
-            token_client.transfer(&from_vault, &to_vault, &balance);
+            // Transfer whole asset amount from one vault to another. No admin fee was configured.
+            token_client.transfer(&from_vault, &to_vault, &balance_1);
         }
         Ok(())
     }
