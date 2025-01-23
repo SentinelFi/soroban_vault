@@ -320,7 +320,7 @@ impl MarketContract {
         // Keeper bots should call this function to lock the vaults if possible
         // Locks vaults to prevent new deposits and withdrawals
         // Can be locked if status is live and current_time >= event_time - lock_seconds
-        // Prevent from locking when already matured or liquidated
+        // Prevent from locking when already matured or liquidated or locked
         if !has_administrator(&env) {
             return Err(MarketError::NotInitialized);
         }
@@ -334,7 +334,8 @@ impl MarketContract {
         }
         Self::_ensure_not_liquidated_or_matured_or_locked(&env)?;
         write_status(&env, &MarketStatus::LOCKED);
-        // TODO: actually lock vaults
+        // Only admin can pause vaults?
+        _ = Self::lock_vaults(&env)?;
         return Ok(true);
     }
 
@@ -450,16 +451,7 @@ impl MarketContract {
         if is_paused(&env) {
             Err(MarketError::ContractIsAlreadyPaused)
         } else {
-            let hedge: Address = read_hedge_vault(&env);
-            let risk: Address = read_risk_vault(&env);
-            let hedge_vault = VaultContractClient::new(&env, &hedge);
-            let risk_vault = VaultContractClient::new(&env, &risk);
-            _ = hedge_vault
-                .try_pause()
-                .map_err(|_| MarketError::VaultPauseFailed)?;
-            _ = risk_vault
-                .try_pause()
-                .map_err(|_| MarketError::VaultPauseFailed)?;
+            _ = Self::lock_vaults(&env)?;
             write_is_paused(&env);
             Ok(true)
         }
@@ -538,10 +530,10 @@ impl MarketContract {
     }
 
     fn _transfer_asset(
-        env: Env,
-        asset_address: Address,
-        from: Address,
-        to: Address,
+        env: &Env,
+        asset_address: &Address,
+        from: &Address,
+        to: &Address,
     ) -> Result<(), MarketError> {
         //from.require_auth();
         let token_client = token::Client::new(&env, &asset_address);
@@ -555,8 +547,8 @@ impl MarketContract {
         if !has_administrator(&env) {
             return Err(MarketError::NotInitialized);
         }
+        let current_timestamp: u64 = env.ledger().timestamp();
         if auto {
-            let current_timestamp: u64 = env.ledger().timestamp();
             write_last_keeper_time(&env, &current_timestamp);
         } else {
             let admin: Address = read_administrator(&env);
@@ -578,9 +570,12 @@ impl MarketContract {
         let hedge: Address = read_hedge_vault(&env);
         let risk: Address = read_risk_vault(&env);
         let asset_address: Address = read_asset(&env);
-        Self::_transfer_asset(env, asset_address, hedge, risk)?;
-        // TODO: unlock withdrawal of one vault
-        // TODO: Emit event
+        Self::_transfer_asset(&env, &asset_address, &hedge, &risk)?;
+        // Unlock withdrawal from one vault
+        Self::unlock_withdrawal(&env, &risk)?;
+        // Emit event
+        let name: String = read_name(&env);
+        Self::_emit_matured_event(&env, &hedge, &risk, name, current_timestamp);
         Ok(true)
     }
 
@@ -588,8 +583,8 @@ impl MarketContract {
         if !has_administrator(&env) {
             return Err(MarketError::NotInitialized);
         }
+        let current_timestamp: u64 = env.ledger().timestamp();
         if auto {
-            let current_timestamp: u64 = env.ledger().timestamp();
             write_last_keeper_time(&env, &current_timestamp);
         } else {
             let admin: Address = read_administrator(&env);
@@ -611,9 +606,56 @@ impl MarketContract {
         let hedge: Address = read_hedge_vault(&env);
         let risk: Address = read_risk_vault(&env);
         let asset_address: Address = read_asset(&env);
-        Self::_transfer_asset(env, asset_address, risk, hedge)?;
-        // TODO: unlock withdrawal of one vault
-        // TODO: Emit event
+        Self::_transfer_asset(&env, &asset_address, &risk, &hedge)?;
+        // Unlock withdrawal from one vault
+        Self::unlock_withdrawal(&env, &hedge)?;
+        // Emit event
+        let name: String = read_name(&env);
+        Self::_emit_liquidated_event(&env, &hedge, &risk, name, current_timestamp);
         Ok(true)
+    }
+
+    fn lock_vaults(env: &Env) -> Result<bool, MarketError> {
+        let hedge: Address = read_hedge_vault(&env);
+        let risk: Address = read_risk_vault(&env);
+        let hedge_vault = VaultContractClient::new(&env, &hedge);
+        let risk_vault = VaultContractClient::new(&env, &risk);
+        _ = hedge_vault
+            .try_pause()
+            .map_err(|_| MarketError::VaultPauseFailed)?;
+        _ = risk_vault
+            .try_pause()
+            .map_err(|_| MarketError::VaultPauseFailed)?;
+        Ok(true)
+    }
+
+    fn unlock_withdrawal(env: &Env, vault: &Address) -> Result<bool, MarketError> {
+        let vault_client = VaultContractClient::new(&env, &vault);
+        _ = vault_client
+            .try_unpause_withdrawal()
+            .map_err(|_| MarketError::WithdrawalUnpauseFailed)?;
+        Ok(true)
+    }
+
+    fn _emit_matured_event(
+        env: &Env,
+        hedge: &Address,
+        risk: &Address,
+        name: String,
+        timestamp: u64,
+    ) {
+        let topics = (symbol_short!("mature"), hedge, risk);
+        env.events().publish(topics, (name, timestamp));
+    }
+
+    fn _emit_liquidated_event(
+        env: &Env,
+        hedge: &Address,
+        risk: &Address,
+        name: String,
+        timestamp: u64,
+    ) {
+        let topics = (symbol_short!("liquidate"), hedge, risk);
+        env.events().publish(topics, (name, timestamp));
     }
 }

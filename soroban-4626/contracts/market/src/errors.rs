@@ -27,4 +27,5 @@ pub enum MarketError {
     AlreadyLiquidated = 21,
     AlreadyLocked = 22,
     EventTimeIsRequired = 23,
+    WithdrawalUnpauseFailed = 24,
 }
