@@ -232,8 +232,13 @@ impl MarketContract {
         if !has_administrator(&env) {
             return Err(MarketError::NotInitialized);
         }
-        // TODO
-        Ok(0)
+        let current_timestamp: u64 = env.ledger().timestamp();
+        let event_timestamp: u64 = read_event_timestamp(&env);
+        let lock_seconds: u64 = read_lock_seconds(&env);
+        if current_timestamp >= event_timestamp - lock_seconds {
+            return Ok(0);
+        }
+        Ok(current_timestamp - event_timestamp - lock_seconds)
     }
 
     pub fn risk_score(env: Env) -> Result<MarketRisk, MarketError> {
@@ -398,62 +403,26 @@ impl MarketContract {
 
     pub fn auto_liquidation(env: Env) -> Result<bool, MarketError> {
         // Trigger automatic liquidation event (can be called by any keeper if auto exercising was enabled)
-        // TODO
-        Self::_ensure_not_paused(&env)?;
-        Ok(true)
+        // Liquidation means that ...
+        Self::liquidate(env, true)
     }
 
     pub fn manual_liquidation(env: Env) -> Result<bool, MarketError> {
         // Trigger manual liquidation event (can be called by admin only if manual exercising was enabled)
-        // TODO
-        Self::_ensure_not_paused(&env)?;
-        // Change Status
-        let current_timestamp: u64 = env.ledger().timestamp();
-        write_status(&env, &MarketStatus::LIQUIDATED);
-        write_last_keeper_time(&env, &current_timestamp);
-        write_liquidated_time(&env, &current_timestamp);
-        Ok(true)
+        // Liquidation means that ...
+        Self::liquidate(env, false)
     }
 
     pub fn auto_maturity(env: Env) -> Result<bool, MarketError> {
         // Trigger automatic maturity event (can be called by any keeper if auto exercising was enabled)
         // Maturity means that ...
-        // Validation
-        if !has_administrator(&env) {
-            return Err(MarketError::NotInitialized);
-        }
-        let current_timestamp: u64 = env.ledger().timestamp();
-        write_last_keeper_time(&env, &current_timestamp);
-        Self::_ensure_not_paused(&env)?;
-        if !read_is_automatic(&env) {
-            return Err(MarketError::WrongExercising);
-        }
-        // Check if can be matured. This also checks if it already matured or liquidated
-        if read_status(&env) != MarketStatus::MATURE {
-            return Err(MarketError::NotMature);
-        }
-        // Set status to inform others that the market has matured
-        write_status(&env, &MarketStatus::MATURED);
-        // TODO: Transfer assets between vaults and charge the commission fee if > 0
-        // If liquidation occurs: Risk collateral is transferred to the Hedge Vault.
-        // If maturity is triggered: Hedge collateral is transferred to the Risk Vault.
-        let hedge: Address = read_hedge_vault(&env);
-        let risk: Address = read_risk_vault(&env);
-        let asset_address: Address = read_asset(&env);
-        let token_client = token::Client::new(&env, &asset_address);
-        let allowance: i128 = token_client.allowance(&hedge, &Self::current_contract_address(env)); // TODO: check allowance first
-        let balance: i128 = token_client.balance(&hedge);
-        token_client.transfer(&hedge, &risk, &balance);
-        // TODO: unlock withdrawal of one vault
-        // TODO: Emit event
-        Ok(true)
+        Self::mature(env, true)
     }
 
     pub fn manual_maturity(env: Env) -> Result<bool, MarketError> {
         // Trigger manual maturity event (can be called by admin only if manual exercising was enabled)
-        // TODO
-        Self::_ensure_not_paused(&env)?;
-        Ok(true)
+        // Maturity means that ...
+        Self::mature(env, false)
     }
 
     pub fn dispute(_env: Env) -> Result<bool, MarketError> {
@@ -552,5 +521,99 @@ impl MarketContract {
             return Err(MarketError::AlreadyLocked);
         }
         Ok(())
+    }
+
+    fn _approve_transfers(
+        env: Env,
+        asset_address: Address,
+        from: Address,
+        expiration_ledger: u32,
+    ) -> Result<(), MarketError> {
+        //from.require_auth();
+        let token_client = token::Client::new(&env, &asset_address);
+        let contract_address: Address = env.current_contract_address();
+        let balance: i128 = token_client.balance(&from);
+        token_client.approve(&from, &contract_address, &balance, &expiration_ledger);
+        Ok(())
+    }
+
+    fn _transfer_asset(
+        env: Env,
+        asset_address: Address,
+        from: Address,
+        to: Address,
+    ) -> Result<(), MarketError> {
+        //from.require_auth();
+        let token_client = token::Client::new(&env, &asset_address);
+        //let allowance: i128 = token_client.allowance(&from, &to); // TODO: check allowance first
+        let balance: i128 = token_client.balance(&from);
+        token_client.transfer(&from, &to, &balance);
+        Ok(())
+    }
+
+    pub fn mature(env: Env, auto: bool) -> Result<bool, MarketError> {
+        if !has_administrator(&env) {
+            return Err(MarketError::NotInitialized);
+        }
+        if auto {
+            let current_timestamp: u64 = env.ledger().timestamp();
+            write_last_keeper_time(&env, &current_timestamp);
+        } else {
+            let admin: Address = read_administrator(&env);
+            admin.require_auth();
+        }
+        Self::_ensure_not_paused(&env)?;
+        if read_is_automatic(&env) != auto {
+            return Err(MarketError::WrongExercising);
+        }
+        // Check if can be matured or liquidated. This also checks if it already matured or liquidated
+        if read_status(&env) != MarketStatus::MATURE {
+            return Err(MarketError::NotMature);
+        }
+        // Set status to inform others that the market has matured
+        write_status(&env, &MarketStatus::MATURED);
+        // TODO: Transfer assets between vaults and charge the commission fee if > 0
+        // If liquidation occurs: Risk collateral is transferred to the Hedge Vault.
+        // If maturity is triggered: Hedge collateral is transferred to the Risk Vault.
+        let hedge: Address = read_hedge_vault(&env);
+        let risk: Address = read_risk_vault(&env);
+        let asset_address: Address = read_asset(&env);
+        Self::_transfer_asset(env, asset_address, hedge, risk)?;
+        // TODO: unlock withdrawal of one vault
+        // TODO: Emit event
+        Ok(true)
+    }
+
+    pub fn liquidate(env: Env, auto: bool) -> Result<bool, MarketError> {
+        if !has_administrator(&env) {
+            return Err(MarketError::NotInitialized);
+        }
+        if auto {
+            let current_timestamp: u64 = env.ledger().timestamp();
+            write_last_keeper_time(&env, &current_timestamp);
+        } else {
+            let admin: Address = read_administrator(&env);
+            admin.require_auth();
+        }
+        Self::_ensure_not_paused(&env)?;
+        if read_is_automatic(&env) != auto {
+            return Err(MarketError::WrongExercising);
+        }
+        // Check if can be matured or liquidated. This also checks if it already matured or liquidated
+        if read_status(&env) != MarketStatus::LIQUIDATE {
+            return Err(MarketError::NotLiquidate);
+        }
+        // Set status to inform others that the market has matured
+        write_status(&env, &MarketStatus::LIQUIDATED);
+        // TODO: Transfer assets between vaults and charge the commission fee if > 0
+        // If liquidation occurs: Risk collateral is transferred to the Hedge Vault.
+        // If maturity is triggered: Hedge collateral is transferred to the Risk Vault.
+        let hedge: Address = read_hedge_vault(&env);
+        let risk: Address = read_risk_vault(&env);
+        let asset_address: Address = read_asset(&env);
+        Self::_transfer_asset(env, asset_address, risk, hedge)?;
+        // TODO: unlock withdrawal of one vault
+        // TODO: Emit event
+        Ok(true)
     }
 }
