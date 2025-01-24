@@ -34,4 +34,6 @@ pub enum MarketError {
     InsufficientAllowance = 28,
     InsufficientAllowanceForFeeTransfer = 29,
     ActualEventTimeNotSet = 30,
+    LiquidatedTimeNotSet = 31,
+    MaturityTimeNotSet = 32,
 }

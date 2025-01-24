@@ -349,7 +349,7 @@ impl MarketContract {
     pub fn liquidated_time(env: Env) -> Result<u64, MarketError> {
         Self::check_is_initialized(&env)?;
         if !has_liquidated_time(&env) {
-            return Err(MarketError::NotLiquidate);
+            return Err(MarketError::LiquidatedTimeNotSet);
         }
         Ok(read_liquidated_time(&env))
     }
@@ -357,7 +357,7 @@ impl MarketContract {
     pub fn matured_time(env: Env) -> Result<u64, MarketError> {
         Self::check_is_initialized(&env)?;
         if !has_matured_time(&env) {
-            return Err(MarketError::NotMature);
+            return Err(MarketError::MaturityTimeNotSet);
         }
         Ok(read_matured_time(&env))
     }

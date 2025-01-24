@@ -175,7 +175,7 @@ pub fn read_risk_score(e: &Env) -> MarketRisk {
 }
 
 pub fn write_risk_score(e: &Env, risk: &MarketRisk) {
-    let key = MarketDataKey::RiskAddress;
+    let key = MarketDataKey::RiskScore;
     e.storage().instance().set(&key, risk);
 }
 
