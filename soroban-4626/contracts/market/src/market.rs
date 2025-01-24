@@ -327,6 +327,16 @@ impl MarketContract {
         Ok(unlock_timestamp)
     }
 
+    pub fn time_until_unlock(env: Env) -> Result<u64, MarketError> {
+        Self::check_is_initialized(&env)?;
+        let current_timestamp: u64 = env.ledger().timestamp();
+        let unlock_time: u64 = Self::time_of_unlock(env)?;
+        if current_timestamp >= unlock_time {
+            return Ok(0);
+        }
+        Ok(unlock_time.checked_sub(current_timestamp).unwrap())
+    }
+
     pub fn risk_score(env: Env) -> Result<MarketRisk, MarketError> {
         Self::check_is_initialized(&env)?;
         Ok(read_risk_score(&env))

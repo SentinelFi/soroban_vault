@@ -41,6 +41,8 @@ stellar contract deploy `
 stellar contract invoke --id <contract_address> --source bob --network testnet -- initialize --admin <admin_address> --asset_address <asset_address>
 ```
 
+[Market Maker Commands](COMMANDS.md)
+
 ---
 
 USDC asset example:
