@@ -215,6 +215,10 @@ impl MarketContract {
         env.current_contract_address()
     }
 
+    pub fn current_ledger(env: Env) -> u64 {
+        env.ledger().timestamp()
+    }
+
     pub fn underlying_asset_address(env: Env) -> Result<Address, MarketError> {
         Self::check_is_initialized(&env)?;
         Ok(read_asset(&env))
@@ -282,10 +286,14 @@ impl MarketContract {
         let current_timestamp: u64 = env.ledger().timestamp();
         let event_timestamp: u64 = read_event_timestamp(&env);
         let lock_seconds: u64 = read_lock_seconds(&env);
-        if current_timestamp >= event_timestamp - lock_seconds {
+        if current_timestamp >= event_timestamp.checked_sub(lock_seconds).unwrap() {
             return Ok(0);
         }
-        Ok(current_timestamp - event_timestamp - lock_seconds)
+        Ok(event_timestamp
+            .checked_sub(lock_seconds)
+            .unwrap()
+            .checked_sub(current_timestamp)
+            .unwrap())
     }
 
     pub fn event_threshold_in_seconds(env: Env) -> Result<u64, MarketError> {
