@@ -32,19 +32,20 @@ use crate::{
     errors::MarketError,
     keys::{MarketRisk, MarketStatus},
     storage::{
-        has_actual_event_timestamp, has_administrator, has_last_keeper_time, has_last_oracle_time,
-        has_liquidated_time, has_matured_time, is_paused, read_actual_event_timestamp,
-        read_administrator, read_asset, read_commission_fee, read_description,
-        read_event_threshold_seconds, read_event_timestamp, read_hedge_vault,
-        read_initialized_time, read_is_automatic, read_last_keeper_time, read_last_oracle_time,
-        read_liquidated_time, read_lock_seconds, read_matured_time, read_name, read_oracle_address,
-        read_oracle_name, read_risk_score, read_risk_vault, read_status, read_unlock_seconds,
-        remove_is_paused, write_actual_event_timestamp, write_administrator, write_asset,
-        write_commission_fee, write_description, write_event_threshold_seconds,
-        write_event_timestamp, write_hedge_vault, write_initialized_time, write_is_automatic,
-        write_is_paused, write_last_keeper_time, write_last_oracle_time, write_liquidated_time,
-        write_lock_seconds, write_matured_time, write_name, write_oracle_address,
-        write_oracle_name, write_risk_score, write_risk_vault, write_status, write_unlock_seconds,
+        extend_contract_ttl, extend_persistence_all_ttl, has_actual_event_timestamp,
+        has_administrator, has_last_keeper_time, has_last_oracle_time, has_liquidated_time,
+        has_matured_time, is_paused, read_actual_event_timestamp, read_administrator, read_asset,
+        read_commission_fee, read_description, read_event_threshold_seconds, read_event_timestamp,
+        read_hedge_vault, read_initialized_time, read_is_automatic, read_last_keeper_time,
+        read_last_oracle_time, read_liquidated_time, read_lock_seconds, read_matured_time,
+        read_name, read_oracle_address, read_oracle_name, read_risk_score, read_risk_vault,
+        read_status, read_unlock_seconds, remove_is_paused, write_actual_event_timestamp,
+        write_administrator, write_asset, write_commission_fee, write_description,
+        write_event_threshold_seconds, write_event_timestamp, write_hedge_vault,
+        write_initialized_time, write_is_automatic, write_is_paused, write_last_keeper_time,
+        write_last_oracle_time, write_liquidated_time, write_lock_seconds, write_matured_time,
+        write_name, write_oracle_address, write_oracle_name, write_risk_score, write_risk_vault,
+        write_status, write_unlock_seconds, BUMP_THRESHOLD, EXTEND_TO_DAYS,
     },
 };
 
@@ -184,6 +185,10 @@ impl MarketContract {
         write_lock_seconds(&env, &data.lock_period_in_seconds);
         write_event_threshold_seconds(&env, &data.event_threshold_in_seconds);
         write_unlock_seconds(&env, &data.unlock_period_in_seconds);
+
+        // Extend TTL
+        extend_contract_ttl(&env, BUMP_THRESHOLD, EXTEND_TO_DAYS);
+        extend_persistence_all_ttl(&env, BUMP_THRESHOLD, EXTEND_TO_DAYS);
 
         // Emit Event
         Self::_emit_init_event(&env, &data.admin_address, data.name, current_timestamp);
@@ -689,6 +694,16 @@ impl MarketContract {
         Err(MarketError::ContractIsAlreadyUnpaused)
     }
 
+    fn extend_ttl(env: &Env) -> Result<bool, MarketError> {
+        // Anyone can call this function to extend time-to-live
+        if has_administrator(&env) {
+            extend_contract_ttl(&env, BUMP_THRESHOLD, EXTEND_TO_DAYS);
+            extend_persistence_all_ttl(&env, BUMP_THRESHOLD, EXTEND_TO_DAYS);
+            Ok(true)
+        } else {
+            Err(MarketError::NotInitialized)
+        }
+    }
     // Private functions
 
     fn check_is_initialized(env: &Env) -> Result<(), MarketError> {

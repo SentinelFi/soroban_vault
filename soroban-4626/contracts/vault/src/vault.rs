@@ -30,13 +30,14 @@ use crate::{
     ivault::IPublicVault,
     math::{mul_div, safe_add_i128, safe_add_u32, safe_mul, safe_pow, safe_sub_i128, Rounding},
     storage::{
-        deposit_paused, has_administrator, is_paused, read_administrator, read_asset_address,
-        read_asset_decimals, read_asset_name, read_asset_symbol, read_lock_timestamp,
-        read_total_shares, read_total_shares_of, read_unlock_timestamp, remove_deposit_paused,
-        remove_paused, remove_withdraw_paused, withdraw_paused, write_administrator,
-        write_asset_address, write_asset_decimals, write_asset_name, write_asset_symbol,
-        write_deposit_paused, write_lock_timestamp, write_paused, write_total_shares,
-        write_total_shares_of, write_unlock_timestamp, write_withdraw_paused,
+        deposit_paused, extend_contract_ttl, extend_persistence_all_ttl, has_administrator,
+        is_paused, read_administrator, read_asset_address, read_asset_decimals, read_asset_name,
+        read_asset_symbol, read_lock_timestamp, read_total_shares, read_total_shares_of,
+        read_unlock_timestamp, remove_deposit_paused, remove_paused, remove_withdraw_paused,
+        withdraw_paused, write_administrator, write_asset_address, write_asset_decimals,
+        write_asset_name, write_asset_symbol, write_deposit_paused, write_lock_timestamp,
+        write_paused, write_total_shares, write_total_shares_of, write_unlock_timestamp,
+        write_withdraw_paused, BUMP_THRESHOLD, EXTEND_TO_DAYS,
     },
 };
 
@@ -83,6 +84,9 @@ impl IPublicVault for Vault {
             write_administrator(&env, &admin);
             write_lock_timestamp(&env, &lock_timestamp);
             write_unlock_timestamp(&env, &unlock_timestamp);
+
+            extend_contract_ttl(&env, BUMP_THRESHOLD, EXTEND_TO_DAYS);
+            extend_persistence_all_ttl(&env, BUMP_THRESHOLD, EXTEND_TO_DAYS);
 
             Self::_emit_initialized_event(
                 &env,
@@ -565,6 +569,17 @@ impl IPublicVault for Vault {
             } else {
                 Err(ContractError::DepositIsAlreadyNotPaused)
             }
+        } else {
+            Err(ContractError::NotInitialized)
+        }
+    }
+
+    fn extend_ttl(env: &Env) -> Result<bool, ContractError> {
+        // Anyone can call this function to extend time-to-live
+        if has_administrator(&env) {
+            extend_contract_ttl(&env, BUMP_THRESHOLD, EXTEND_TO_DAYS);
+            extend_persistence_all_ttl(&env, BUMP_THRESHOLD, EXTEND_TO_DAYS);
+            Ok(true)
         } else {
             Err(ContractError::NotInitialized)
         }

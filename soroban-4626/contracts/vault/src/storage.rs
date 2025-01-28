@@ -49,12 +49,12 @@ pub fn write_asset_decimals(e: &Env, decimals: &u32) {
 
 pub fn write_total_shares(e: &Env, shares: &i128) {
     let key = DataKey::TotalShares;
-    e.storage().persistent().set(&key, shares);
+    e.storage().instance().set(&key, shares);
 }
 
 pub fn write_total_shares_of(e: &Env, adress: Address, shares: &i128) {
     let key = DataKey::TotalSharesOf(adress);
-    e.storage().persistent().set(&key, shares);
+    e.storage().instance().set(&key, shares);
 }
 
 pub fn read_asset_decimals(e: &Env) -> u32 {
@@ -79,27 +79,27 @@ pub fn read_asset_address(e: &Env) -> Address {
 
 pub fn read_total_shares(e: &Env) -> i128 {
     let key = DataKey::TotalShares;
-    e.storage().persistent().get(&key).unwrap()
+    e.storage().instance().get(&key).unwrap()
 }
 
 pub fn read_total_shares_of(e: &Env, address: Address) -> i128 {
     let key = DataKey::TotalSharesOf(address);
-    e.storage().persistent().get(&key).unwrap_or(0)
+    e.storage().instance().get(&key).unwrap_or(0)
 }
 
 pub fn read_allowance(e: &Env, owner: Address, spender: Address) -> Option<AllowanceData> {
     let key = DataKey::Allowance(owner.clone(), spender.clone());
-    e.storage().persistent().get(&key)
+    e.storage().instance().get(&key)
 }
 
 pub fn write_allowance(e: &Env, owner: Address, spender: Address, allowance: AllowanceData) {
     let key = DataKey::Allowance(owner.clone(), spender.clone());
-    e.storage().persistent().set(&key, &allowance);
+    e.storage().instance().set(&key, &allowance);
 }
 
 pub fn remove_allowance(e: &Env, owner: Address, spender: Address) {
     let key = DataKey::Allowance(owner.clone(), spender.clone());
-    e.storage().persistent().remove(&key);
+    e.storage().instance().remove(&key);
 }
 
 pub fn is_paused(e: &Env) -> bool {
@@ -189,18 +189,25 @@ const DAY_IN_LEDGERS: u32 = 17280; // One day, assuming 5s per ledger: 24 * 60 *
 #[allow(dead_code)]
 const MAXIMUM_EXTEND_DAYS: u32 = 30; // One month
 #[allow(dead_code)]
-const EXTEND_TO_DAYS: u32 = MAXIMUM_EXTEND_DAYS * DAY_IN_LEDGERS; // Extend TTL to maximum 30 days
+pub const EXTEND_TO_DAYS: u32 = MAXIMUM_EXTEND_DAYS * DAY_IN_LEDGERS; // Extend TTL to maximum 30 days
 #[allow(dead_code)]
-const BUMP_THRESHOLD: u32 = EXTEND_TO_DAYS - DAY_IN_LEDGERS; // One day threshold
+pub const BUMP_THRESHOLD: u32 = EXTEND_TO_DAYS - DAY_IN_LEDGERS; // One day threshold
 
 #[allow(dead_code)]
-pub fn extend_contract_ttl(env: Env, threshold: u32, extend_to: u32) {
+pub fn extend_contract_ttl(env: &Env, threshold: u32, extend_to: u32) {
     env.storage().instance().extend_ttl(threshold, extend_to);
 }
 
 #[allow(dead_code)]
-pub fn extend_persistence_ttl(env: Env, key: DataKey, threshold: u32, extend_to: u32) {
+pub fn extend_persistence_ttl(env: &Env, key: DataKey, threshold: u32, extend_to: u32) {
     env.storage()
         .persistent()
         .extend_ttl(&key, threshold, extend_to);
+}
+
+#[allow(dead_code)]
+pub fn extend_persistence_all_ttl(_env: &Env, _threshold: u32, _extend_to: u32) {
+    // call extend_persistence_ttl (above) with persistence keys one by one
+    // currently no key is stored in persistence, only in instance
+    // .. add more as needed
 }

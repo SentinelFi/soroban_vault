@@ -276,18 +276,25 @@ const DAY_IN_LEDGERS: u32 = 17280; // One day, assuming 5s per ledger: 24 * 60 *
 #[allow(dead_code)]
 const MAXIMUM_EXTEND_DAYS: u32 = 30; // One month
 #[allow(dead_code)]
-const EXTEND_TO_DAYS: u32 = MAXIMUM_EXTEND_DAYS * DAY_IN_LEDGERS; // Extend TTL to maximum 30 days
+pub const EXTEND_TO_DAYS: u32 = MAXIMUM_EXTEND_DAYS * DAY_IN_LEDGERS; // Extend TTL to maximum 30 days
 #[allow(dead_code)]
-const BUMP_THRESHOLD: u32 = EXTEND_TO_DAYS - DAY_IN_LEDGERS; // One day threshold
+pub const BUMP_THRESHOLD: u32 = EXTEND_TO_DAYS - DAY_IN_LEDGERS; // One day threshold
 
 #[allow(dead_code)]
-pub fn extend_contract_ttl(env: Env, threshold: u32, extend_to: u32) {
+pub fn extend_contract_ttl(env: &Env, threshold: u32, extend_to: u32) {
     env.storage().instance().extend_ttl(threshold, extend_to);
 }
 
 #[allow(dead_code)]
-pub fn extend_persistence_ttl(env: Env, key: MarketDataKey, threshold: u32, extend_to: u32) {
+pub fn extend_persistence_ttl(env: &Env, key: MarketDataKey, threshold: u32, extend_to: u32) {
     env.storage()
         .persistent()
         .extend_ttl(&key, threshold, extend_to);
+}
+
+#[allow(dead_code)]
+pub fn extend_persistence_all_ttl(_env: &Env, _threshold: u32, _extend_to: u32) {
+    // call extend_persistence_ttl (above) with persistence keys one by one
+    // currently no key is stored in persistence, only in instance
+    // .. add more as needed
 }

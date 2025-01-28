@@ -170,6 +170,8 @@ stellar contract invoke --id market_contract_address_here --source bob --network
 stellar contract invoke --id market_contract_address_here --source bob --network testnet -- pause_market
 
 stellar contract invoke --id market_contract_address_here --source bob --network testnet -- unpause_market
+
+stellar contract invoke --id market_contract_address_here --source bob --network testnet -- extend_ttl
 ```
 
 ---
