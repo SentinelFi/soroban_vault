@@ -69,7 +69,7 @@ pub fn write_oracle_address(e: &Env, address: &Address) {
     e.storage().instance().set(&key, address);
 }
 
-pub fn read_oracle_name(e: &Env) -> Address {
+pub fn read_oracle_name(e: &Env) -> String {
     let key = MarketDataKey::OracleName;
     e.storage().instance().get(&key).unwrap()
 }

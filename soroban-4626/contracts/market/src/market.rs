@@ -240,7 +240,7 @@ impl MarketContract {
         Ok(read_oracle_address(&env))
     }
 
-    pub fn oracle_name(env: Env) -> Result<Address, MarketError> {
+    pub fn oracle_name(env: Env) -> Result<String, MarketError> {
         Self::check_is_initialized(&env)?;
         Ok(read_oracle_name(&env))
     }
