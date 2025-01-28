@@ -27,6 +27,7 @@ pub enum MarketDataKey {
     HedgeAddress,
     RiskAddress,
     OracleAddress,
+    OracleName,
     Status,
     Name,
     Description,

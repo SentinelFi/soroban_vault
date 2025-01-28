@@ -9,6 +9,7 @@ pub struct MarketData {
     pub description: String,
     pub admin_address: Address,
     pub asset_address: Address,
+    pub trusted_oracle_name: String,
     pub trusted_oracle_address: Address,
     pub hedge_vault_address: Address,
     pub risk_vault_address: Address,

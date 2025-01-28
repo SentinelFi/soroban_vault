@@ -40,6 +40,7 @@ stellar contract invoke \
       "admin_address": "GD...",
       "asset_address": "CB...",
       "trusted_oracle_address": "GD...",
+      "trusted_oracle_name": "some",
       "hedge_vault_address": "CD...",
       "risk_vault_address": "CD...",
       "commission_fee": 10,
@@ -104,7 +105,9 @@ stellar contract invoke --id market_contract_address_here --source bob --network
 
 stellar contract invoke --id market_contract_address_here --source bob --network testnet -- oracle_address
 
-stellar contract invoke --id market_contract_address_here --source bob --network testnet -- change_oracle_address --oracle oracle_address_here
+stellar contract invoke --id market_contract_address_here --source bob --network testnet -- oracle_name
+
+stellar contract invoke --id market_contract_address_here --source bob --network testnet -- change_oracle --oracle_address oracle_address_here --oracle_name oracle_name_here
 
 stellar contract invoke --id market_contract_address_here --source bob --network testnet -- initialized_time
 

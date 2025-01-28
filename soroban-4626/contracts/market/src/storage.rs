@@ -59,14 +59,24 @@ pub fn write_risk_vault(e: &Env, address: &Address) {
     e.storage().instance().set(&key, address);
 }
 
-pub fn read_oracle(e: &Env) -> Address {
+pub fn read_oracle_address(e: &Env) -> Address {
     let key = MarketDataKey::OracleAddress;
     e.storage().instance().get(&key).unwrap()
 }
 
-pub fn write_oracle(e: &Env, address: &Address) {
+pub fn write_oracle_address(e: &Env, address: &Address) {
     let key = MarketDataKey::OracleAddress;
     e.storage().instance().set(&key, address);
+}
+
+pub fn read_oracle_name(e: &Env) -> Address {
+    let key = MarketDataKey::OracleName;
+    e.storage().instance().get(&key).unwrap()
+}
+
+pub fn write_oracle_name(e: &Env, name: &String) {
+    let key = MarketDataKey::OracleName;
+    e.storage().instance().set(&key, name);
 }
 
 pub fn read_name(e: &Env) -> String {

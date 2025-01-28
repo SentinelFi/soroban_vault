@@ -37,14 +37,14 @@ use crate::{
         read_administrator, read_asset, read_commission_fee, read_description,
         read_event_threshold_seconds, read_event_timestamp, read_hedge_vault,
         read_initialized_time, read_is_automatic, read_last_keeper_time, read_last_oracle_time,
-        read_liquidated_time, read_lock_seconds, read_matured_time, read_name, read_oracle,
-        read_risk_score, read_risk_vault, read_status, read_unlock_seconds, remove_is_paused,
-        write_actual_event_timestamp, write_administrator, write_asset, write_commission_fee,
-        write_description, write_event_threshold_seconds, write_event_timestamp, write_hedge_vault,
-        write_initialized_time, write_is_automatic, write_is_paused, write_last_keeper_time,
-        write_last_oracle_time, write_liquidated_time, write_lock_seconds, write_matured_time,
-        write_name, write_oracle, write_risk_score, write_risk_vault, write_status,
-        write_unlock_seconds,
+        read_liquidated_time, read_lock_seconds, read_matured_time, read_name, read_oracle_address,
+        read_oracle_name, read_risk_score, read_risk_vault, read_status, read_unlock_seconds,
+        remove_is_paused, write_actual_event_timestamp, write_administrator, write_asset,
+        write_commission_fee, write_description, write_event_threshold_seconds,
+        write_event_timestamp, write_hedge_vault, write_initialized_time, write_is_automatic,
+        write_is_paused, write_last_keeper_time, write_last_oracle_time, write_liquidated_time,
+        write_lock_seconds, write_matured_time, write_name, write_oracle_address,
+        write_oracle_name, write_risk_score, write_risk_vault, write_status, write_unlock_seconds,
     },
 };
 
@@ -171,7 +171,8 @@ impl MarketContract {
         write_asset(&env, &data.asset_address);
         write_hedge_vault(&env, &data.hedge_vault_address);
         write_risk_vault(&env, &data.risk_vault_address);
-        write_oracle(&env, &data.trusted_oracle_address);
+        write_oracle_address(&env, &data.trusted_oracle_address);
+        write_oracle_name(&env, &data.trusted_oracle_name);
         write_status(&env, &MarketStatus::LIVE);
         write_name(&env, &data.name);
         write_description(&env, &data.description);
@@ -236,15 +237,25 @@ impl MarketContract {
 
     pub fn oracle_address(env: Env) -> Result<Address, MarketError> {
         Self::check_is_initialized(&env)?;
-        Ok(read_oracle(&env))
+        Ok(read_oracle_address(&env))
     }
 
-    pub fn change_oracle_address(env: Env, oracle: Address) -> Result<bool, MarketError> {
+    pub fn oracle_name(env: Env) -> Result<Address, MarketError> {
+        Self::check_is_initialized(&env)?;
+        Ok(read_oracle_name(&env))
+    }
+
+    pub fn change_oracle(
+        env: Env,
+        oracle_address: Address,
+        oracle_name: String,
+    ) -> Result<bool, MarketError> {
         Self::check_is_initialized(&env)?;
         Self::ensure_not_paused(&env)?;
         let admin: Address = read_administrator(&env);
         admin.require_auth();
-        write_oracle(&env, &oracle);
+        write_oracle_address(&env, &oracle_address);
+        write_oracle_name(&env, &oracle_name);
         Ok(true)
     }
 
@@ -438,7 +449,7 @@ impl MarketContract {
         // If event didn't occurr and no event time sent, then ignore.
         // Note that oracles can only set the status to 'can liquidate' or 'can mature'. The actual liquidation or maturity action is done by keepers.
         Self::check_is_initialized(&env)?;
-        let oracle: Address = read_oracle(&env);
+        let oracle: Address = read_oracle_address(&env);
         oracle.require_auth();
         let current_timestamp: u64 = env.ledger().timestamp();
         write_last_oracle_time(&env, &current_timestamp);
