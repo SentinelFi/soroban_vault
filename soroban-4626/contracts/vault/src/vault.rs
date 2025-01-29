@@ -574,7 +574,7 @@ impl IPublicVault for Vault {
         }
     }
 
-    fn extend_ttl(env: &Env) -> Result<bool, ContractError> {
+    fn extend_vault_ttl(env: &Env) -> Result<bool, ContractError> {
         // Anyone can call this function to extend time-to-live
         if has_administrator(&env) {
             extend_contract_ttl(&env, BUMP_THRESHOLD, EXTEND_TO_DAYS);

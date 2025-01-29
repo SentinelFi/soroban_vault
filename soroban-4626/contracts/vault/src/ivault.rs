@@ -92,5 +92,5 @@ pub trait IPublicVault {
     fn pause_withdrawal(env: Env) -> Result<bool, ContractError>;
     fn unpause_withdrawal(env: Env) -> Result<bool, ContractError>;
     fn unpause_deposit(env: Env) -> Result<bool, ContractError>;
-    fn extend_ttl(env: &Env) -> Result<bool, ContractError>;
+    fn extend_vault_ttl(env: &Env) -> Result<bool, ContractError>;
 }

@@ -28,7 +28,7 @@ use soroban_sdk::{
 use vault::vault::VaultContractClient;
 
 use crate::{
-    data::MarketData,
+    data::{MarketData, MarketDetails},
     errors::MarketError,
     keys::{MarketRisk, MarketStatus},
     storage::{
@@ -694,7 +694,7 @@ impl MarketContract {
         Err(MarketError::ContractIsAlreadyUnpaused)
     }
 
-    fn extend_ttl(env: &Env) -> Result<bool, MarketError> {
+    pub fn extend_market_ttl(env: &Env) -> Result<bool, MarketError> {
         // Anyone can call this function to extend time-to-live
         if has_administrator(&env) {
             extend_contract_ttl(&env, BUMP_THRESHOLD, EXTEND_TO_DAYS);
@@ -704,6 +704,64 @@ impl MarketContract {
             Err(MarketError::NotInitialized)
         }
     }
+
+    pub fn market_details(env: &Env) -> Result<MarketDetails, MarketError> {
+        if has_administrator(&env) {
+            let name = read_name(&env);
+            let description = read_description(&env);
+            let status = read_status(&env);
+            let hedge_address = read_hedge_vault(&env);
+            let risk_address = read_risk_vault(&env);
+            let oracle_address = read_oracle_address(&env);
+            let oracle_name = read_oracle_name(&env);
+            let risk_score = read_risk_score(&env);
+            let event_time = read_event_timestamp(&env);
+            let is_automatic = read_is_automatic(&env);
+            let commission_fee = read_commission_fee(&env);
+
+            let hedge_vault = VaultContractClient::new(&env, &hedge_address);
+            let risk_vault = VaultContractClient::new(&env, &risk_address);
+
+            let hedge_admin_address = hedge_vault.administrator_address();
+            let hedge_asset_address = hedge_vault.asset_address();
+            let hedge_asset_symbol = hedge_vault.asset_symbol();
+            let hedge_total_shares = hedge_vault.total_shares();
+            let hedge_total_assets = hedge_vault.total_assets();
+
+            let risk_admin_address = risk_vault.administrator_address();
+            let risk_asset_address = risk_vault.asset_address();
+            let risk_asset_symbol = risk_vault.asset_symbol();
+            let risk_total_shares = risk_vault.total_shares();
+            let risk_total_assets = risk_vault.total_assets();
+
+            Ok(MarketDetails {
+                name,
+                description,
+                status,
+                hedge_address,
+                risk_address,
+                oracle_address,
+                oracle_name,
+                risk_score,
+                event_time,
+                is_automatic,
+                commission_fee,
+                hedge_admin_address,
+                hedge_asset_address,
+                hedge_asset_symbol,
+                hedge_total_shares,
+                hedge_total_assets,
+                risk_admin_address,
+                risk_asset_address,
+                risk_asset_symbol,
+                risk_total_shares,
+                risk_total_assets,
+            })
+        } else {
+            Err(MarketError::NotInitialized)
+        }
+    }
+
     // Private functions
 
     fn check_is_initialized(env: &Env) -> Result<(), MarketError> {
