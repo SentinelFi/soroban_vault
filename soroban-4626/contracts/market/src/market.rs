@@ -705,7 +705,7 @@ impl MarketContract {
         }
     }
 
-    pub fn market_details(env: &Env) -> Result<MarketDetails, MarketError> {
+    pub fn market_details(env: &Env, caller: Address) -> Result<MarketDetails, MarketError> {
         if has_administrator(&env) {
             let name = read_name(&env);
             let description = read_description(&env);
@@ -727,12 +727,14 @@ impl MarketContract {
             let hedge_asset_symbol = hedge_vault.asset_symbol();
             let hedge_total_shares = hedge_vault.total_shares();
             let hedge_total_assets = hedge_vault.total_assets();
+            let hedge_address_shares = hedge_vault.balance_of_shares(&caller);
 
             let risk_admin_address = risk_vault.administrator_address();
             let risk_asset_address = risk_vault.asset_address();
             let risk_asset_symbol = risk_vault.asset_symbol();
             let risk_total_shares = risk_vault.total_shares();
             let risk_total_assets = risk_vault.total_assets();
+            let risk_address_shares = risk_vault.balance_of_shares(&caller);
 
             Ok(MarketDetails {
                 name,
@@ -751,11 +753,13 @@ impl MarketContract {
                 hedge_asset_symbol,
                 hedge_total_shares,
                 hedge_total_assets,
+                hedge_address_shares,
                 risk_admin_address,
                 risk_asset_address,
                 risk_asset_symbol,
                 risk_total_shares,
                 risk_total_assets,
+                risk_address_shares,
             })
         } else {
             Err(MarketError::NotInitialized)

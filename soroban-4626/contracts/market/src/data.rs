@@ -41,9 +41,11 @@ pub struct MarketDetails {
     pub hedge_asset_symbol: String,
     pub hedge_total_shares: i128,
     pub hedge_total_assets: i128,
+    pub hedge_address_shares: i128,
     pub risk_admin_address: Address,
     pub risk_asset_address: Address,
     pub risk_asset_symbol: String,
     pub risk_total_shares: i128,
     pub risk_total_assets: i128,
+    pub risk_address_shares: i128,
 }
