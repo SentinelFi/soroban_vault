@@ -17,6 +17,7 @@ pub enum VaultError {
     InvalidExpiry = 11,
     InvalidExpiryDays = 12,
     AdministratorError = 13,
+    CannotApproveOrTransferToSelf = 14,
 }
 
 #[contracterror]

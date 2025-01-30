@@ -71,7 +71,7 @@ pub trait IPublicVault {
         spender: Address,
         approve_amount: i128,
         expire_in_days: u32,
-    ) -> Result<(), VaultError>;
+    ) -> Result<bool, VaultError>;
     fn transfer_shares(
         env: Env,
         owner: Address,

@@ -392,14 +392,19 @@ impl IPublicVault for Vault {
         spender: Address,
         approve_amount: i128,
         expire_in_days: u32,
-    ) -> Result<(), VaultError> {
+    ) -> Result<bool, VaultError> {
         if has_administrator(&env) {
             owner.require_auth();
             if approve_amount <= 0 {
                 Err(VaultError::InvalidAmount)
             } else {
-                let expiry_ledger: u32 = _calculate_expiry_ledger(&env, expire_in_days)?;
-                _approve_allowance(&env, &owner, &spender, approve_amount, expiry_ledger)
+                if owner == spender {
+                    Err(VaultError::CannotApproveOrTransferToSelf)
+                } else {
+                    let expiry_ledger: u32 = _calculate_expiry_ledger(&env, expire_in_days)?;
+                    _approve_allowance(&env, &owner, &spender, approve_amount, expiry_ledger)?;
+                    Ok(true)
+                }
             }
         } else {
             Err(VaultError::AdministratorError)
@@ -421,21 +426,25 @@ impl IPublicVault for Vault {
                 if owner_shares < shares_amount {
                     Err(VaultError::InvalidAmount)
                 } else {
-                    // Change owner's and receiver's token balances
-                    // Total shares should remain unchanged
-                    let receiver_shares: i128 = read_total_shares_of(&env, receiver.clone());
-                    write_total_shares_of(
-                        &env,
-                        owner.clone(),
-                        &safe_sub_i128(owner_shares, shares_amount),
-                    );
-                    write_total_shares_of(
-                        &env,
-                        receiver.clone(),
-                        &safe_add_i128(receiver_shares, shares_amount),
-                    );
-                    Self::_emit_transfer_shares_event(&env, &owner, &receiver, shares_amount);
-                    Ok(true)
+                    if owner == receiver {
+                        Err(VaultError::CannotApproveOrTransferToSelf)
+                    } else {
+                        // Change owner's and receiver's token balances
+                        // Total shares should remain unchanged
+                        let receiver_shares: i128 = read_total_shares_of(&env, receiver.clone());
+                        write_total_shares_of(
+                            &env,
+                            owner.clone(),
+                            &safe_sub_i128(owner_shares, shares_amount),
+                        );
+                        write_total_shares_of(
+                            &env,
+                            receiver.clone(),
+                            &safe_add_i128(receiver_shares, shares_amount),
+                        );
+                        Self::_emit_transfer_shares_event(&env, &owner, &receiver, shares_amount);
+                        Ok(true)
+                    }
                 }
             }
         } else {
