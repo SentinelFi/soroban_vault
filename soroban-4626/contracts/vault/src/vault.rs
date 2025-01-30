@@ -28,7 +28,9 @@ use crate::{
     allowance::{_approve_allowance, _calculate_expiry_ledger, _spend_allowance},
     errors::{ContractError, VaultError},
     ivault::IPublicVault,
-    math::{mul_div, safe_add_i128, safe_add_u32, safe_mul, safe_pow, safe_sub_i128, Rounding},
+    math::{
+        mul_div, safe_add_i128, safe_add_u32, safe_div, safe_mul, safe_pow, safe_sub_i128, Rounding,
+    },
     storage::{
         deposit_paused, extend_contract_ttl, extend_persistence_all_ttl, has_administrator,
         is_paused, read_administrator, read_asset_address, read_asset_decimals, read_asset_name,
@@ -156,7 +158,8 @@ impl IPublicVault for Vault {
             let token_client = token::Client::new(&env, &asset_address);
             let this_address: Address = Self::contract_address(&env);
             let balance: i128 = token_client.balance(&this_address);
-            Ok(balance)
+            let return_balance: i128 = Self::_divide_by_decimals(env, balance);
+            Ok(return_balance)
         } else {
             Err(ContractError::NotInitialized)
         }
@@ -610,8 +613,15 @@ impl Vault {
 
     fn _multiply_by_decimals(env: &Env, amount: i128) -> i128 {
         let decimals: u32 = read_asset_decimals(&env);
-        let result_pow: i128 = safe_pow(10i128, decimals);
+        let result_pow: i128 = safe_pow(10_i128, decimals);
         let result: i128 = safe_mul(amount, result_pow);
+        result
+    }
+
+    fn _divide_by_decimals(env: &Env, amount: i128) -> i128 {
+        let decimals: u32 = read_asset_decimals(&env);
+        let result_pow: i128 = safe_pow(10_i128, decimals);
+        let result: i128 = safe_div(amount, result_pow);
         result
     }
 
@@ -760,11 +770,15 @@ impl Vault {
         Self::_ensure_contract_not_paused(_env);
         Self::_ensure_deposit_not_paused(_env);
         Self::_ensure_not_locked(_env);
-        // Transfer underlying assets from caller to vault
-        // This must happen before minting shares to prevent reentrancy issues
-        let result: i128 = Self::_multiply_by_decimals(&_env, _assets);
         let asset_address: Address = read_asset_address(_env);
         let token_client = token::Client::new(_env, &asset_address);
+        let result: i128 = Self::_multiply_by_decimals(&_env, _assets);
+        let balance: i128 = token_client.balance(&_caller);
+        if balance < result {
+            panic!("Insufficient balance")
+        }
+        // Transfer underlying assets from caller to vault
+        // This must happen before minting shares to prevent reentrancy issues
         token_client.transfer(&_caller, &Self::contract_address(_env), &result);
         // Mint new share tokens to receiver, update total shares and receiver's shares
         Self::_mint_shares(&_env, &_receiver, _shares);
@@ -788,13 +802,17 @@ impl Vault {
         if _caller != _owner {
             _spend_allowance(&_env, &_owner, &_caller, _shares).unwrap();
         }
+        let asset_address: Address = read_asset_address(_env);
+        let token_client = token::Client::new(_env, &asset_address);
+        let result: i128 = Self::_multiply_by_decimals(&_env, _assets);
+        let balance: i128 = token_client.balance(&Self::contract_address(_env));
+        if balance < result {
+            panic!("Insufficient balance")
+        }
         // Burn share tokens from owner, update total shares and owner's shares
         // This must happen before transferring assets to prevent reentrancy
         Self::_burn_shares(&_env, _owner, _shares);
         // Transfer underlying assets from vault to receiver
-        let result: i128 = Self::_multiply_by_decimals(&_env, _assets);
-        let asset_address: Address = read_asset_address(_env);
-        let token_client = token::Client::new(_env, &asset_address);
         token_client.transfer(&Self::contract_address(_env), &_receiver, &result);
         // Emit event
         Self::_emit_withdraw_event(_env, _caller, _receiver, _owner, _assets, _shares);
