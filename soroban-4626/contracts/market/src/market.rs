@@ -454,8 +454,9 @@ impl MarketContract {
         // If event didn't occurr and no event time sent, then ignore.
         // Note that oracles can only set the status to 'can liquidate' or 'can mature'. The actual liquidation or maturity action is done by keepers.
         Self::check_is_initialized(&env)?;
-        let oracle: Address = read_oracle_address(&env);
-        oracle.require_auth();
+        // For now not required
+        // let oracle: Address = read_oracle_address(&env);
+        // oracle.require_auth();
         let current_timestamp: u64 = env.ledger().timestamp();
         write_last_oracle_time(&env, &current_timestamp);
         Self::ensure_not_paused(&env)?;
