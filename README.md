@@ -1,5 +1,7 @@
 # Soroban Vault
 
+**Important**: This is a draft implementation intended for testing purposes only. For production deployments, we strongly recommend using [OpenZeppelin's audited standard contracts](https://github.com/OpenZeppelin/stellar-contracts).
+
 ---
 
 First and foremost, setup development environment:
@@ -94,3 +96,6 @@ pub trait StellarAssetInterface
 ```
 
 ---
+
+> [!Warning]
+> While we strive to ensure this software functions as intended, it is provided “as is” with no warranties or guarantees of any kind. Smart contracts are inherently complex and may contain bugs, vulnerabilities, or unintended behaviors. By using this software, you acknowledge and agree that: You use it entirely at your own risk. You should perform your own due diligence, and it is strongly recommended to consult qualified professionals (e.g., security auditors, legal advisors). We do not accept any liability for any loss of funds, damages, or other consequences resulting from the use or misuse of this code.
